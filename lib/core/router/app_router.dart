@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/auth/auth_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
+import '../../features/profile/profile_screen.dart';
+import '../../features/profile/personal_info_kyc_screen.dart';
+import '../../features/kyc/kyc_screen.dart';
+import '../../features/requests/requests_screen.dart' as requests_feature;
+import '../../core/providers/auth_provider.dart';
 
 /// Configuration des routes de l'application SEZAM
 class AppRouter {
+  static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     routes: [
       // Splash Screen
@@ -31,10 +40,17 @@ class AppRouter {
         builder: (context, state) => const AuthScreen(),
       ),
       
-      // Dashboard (avec navigation bottom)
+      // Dashboard (avec navigation bottom) - Protected route
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
         builder: (context, state) => const DashboardScreen(),
       ),
       
@@ -45,18 +61,53 @@ class AppRouter {
         builder: (context, state) => const DocumentsScreen(),
       ),
       
-      // Requests
+      // Requests (use real feature screen)
       GoRoute(
         path: '/requests',
         name: 'requests',
-        builder: (context, state) => const RequestsScreen(),
+        builder: (context, state) => const requests_feature.RequestsScreen(),
       ),
       
-      // Profile
+      // Profile - Protected route
       GoRoute(
         path: '/profile',
         name: 'profile',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
         builder: (context, state) => const ProfileScreen(),
+      ),
+      
+      // KYC - Protected route
+      GoRoute(
+        path: '/kyc',
+        name: 'kyc',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const KycScreen(),
+      ),
+      
+      // Personal Info KYC - Protected route
+      GoRoute(
+        path: '/personal-info-kyc',
+        name: 'personal-info-kyc',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const PersonalInfoKycScreen(),
       ),
     ],
     errorBuilder: (context, state) => const ErrorScreen(),
@@ -78,33 +129,9 @@ class DocumentsScreen extends StatelessWidget {
   }
 }
 
-class RequestsScreen extends StatelessWidget {
-  const RequestsScreen({super.key});
+// Removed placeholder RequestsScreen; using real implementation from features/requests/requests_screen.dart
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Demandes')),
-      body: const Center(
-        child: Text('Écran Demandes - À implémenter'),
-      ),
-    );
-  }
-}
-
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Profil')),
-      body: const Center(
-        child: Text('Écran Profil - À implémenter'),
-      ),
-    );
-  }
-}
+// ProfileScreen is imported from features/profile/profile_screen.dart
 
 class ErrorScreen extends StatelessWidget {
   const ErrorScreen({super.key});

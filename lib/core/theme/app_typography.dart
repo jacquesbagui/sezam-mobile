@@ -65,6 +65,12 @@ class AppTypography {
     fontWeight: FontWeight.normal,
     height: lineHeightNormal,
   );
+
+  static TextStyle get bodyXSmall => GoogleFonts.inter(
+    fontSize: fontSizeXs,
+    fontWeight: FontWeight.normal,
+    height: lineHeightNormal,
+  );
   
   static TextStyle get caption => GoogleFonts.inter(
     fontSize: fontSizeXs,

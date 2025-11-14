@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/sezam_button.dart';
 import '../../core/widgets/sezam_text_field.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/utils/kyc_redirection.dart';
+import 'widgets/phone_input_field.dart';
+import 'widgets/input_type_segmented_control.dart';
+import 'widgets/password_strength_indicator.dart';
+import 'widgets/otp_verification_dialog.dart';
 
 /// Écran d'authentification de l'application SEZAM
 class AuthScreen extends StatefulWidget {
@@ -17,10 +24,16 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _firstNameFocusNode = FocusNode();
+  final _lastNameFocusNode = FocusNode();
   final _emailFocusNode = FocusNode();
+  final _phoneFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
   final _confirmPasswordFocusNode = FocusNode();
 
@@ -34,6 +47,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String? _errorMessage;
+  String _signupPhone = '';
 
   @override
   void initState() {
@@ -54,15 +68,24 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         setState(() {}); // Trigger rebuild for password strength
       }
     });
+
+    // Focus initial field depending on mode
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusInitialField());
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _firstNameFocusNode.dispose();
+    _lastNameFocusNode.dispose();
     _emailFocusNode.dispose();
+    _phoneFocusNode.dispose();
     _passwordFocusNode.dispose();
     _confirmPasswordFocusNode.dispose();
     super.dispose();
@@ -75,6 +98,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _animationController.reset();
       _animationController.forward();
     });
+    // Move focus to the appropriate first field
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusInitialField());
   }
 
   void _toggleInputType() {
@@ -83,6 +108,14 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _emailController.clear();
       _errorMessage = null;
     });
+  }
+
+  void _focusInitialField() {
+    if (_isLogin) {
+      _emailFocusNode.requestFocus();
+    } else {
+      _firstNameFocusNode.requestFocus();
+    }
   }
 
   PasswordStrength _getPasswordStrength(String password) {
@@ -126,9 +159,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     if (value == null || value.isEmpty) {
       return 'Veuillez entrer votre téléphone';
     }
-    // Remove spaces and check format
-    String cleanPhone = value.replaceAll(' ', '');
-    if (!RegExp(r'^\+?[0-9]{10,13}$').hasMatch(cleanPhone)) {
+    if (value.length < 8) {
       return 'Veuillez entrer un numéro de téléphone valide';
     }
     return null;
@@ -142,6 +173,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       HapticFeedback.lightImpact();
       return;
     }
+
+    // En inscription, l'email est requis (géré par validator). Pas de bascule téléphone.
 
     // Check password confirmation for signup
     if (!_isLogin && _passwordController.text != _confirmPasswordController.text) {
@@ -157,18 +190,62 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       _errorMessage = null;
     });
 
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
     try {
-      // Simulation d'authentification
-      await Future.delayed(const Duration(seconds: 2));
+      if (_isLogin) {
+        // Login
+        final success = await authProvider.login(
+          _emailController.text.trim(),
+          _passwordController.text,
+          rememberMe: _rememberMe,
+        );
 
-      // Simulate random error for demo (10% chance)
-      if (DateTime.now().millisecond % 10 == 0) {
-        throw Exception('Identifiants incorrects');
-      }
+        if (!mounted) return;
 
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        context.go('/dashboard');
+        setState(() {
+          _isLoading = false; // Toujours arrêter le loading local
+        });
+        
+        if (!success && authProvider.requiresOtp) {
+          // Afficher le dialogue OTP
+          _showOtpDialog(authProvider);
+        } else if (authProvider.errorMessage != null) {
+          setState(() {
+            _errorMessage = authProvider.errorMessage;
+          });
+          HapticFeedback.lightImpact();
+        } else {
+          HapticFeedback.mediumImpact();
+          // Login réussi: redirection
+          await KycRedirection.redirectAfterLogin(context);
+        }
+      } else {
+        // Register
+        await authProvider.register(
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _signupPhone.trim().isEmpty ? null : _signupPhone.trim(),
+          password: _passwordController.text,
+        );
+
+        if (!mounted) return;
+
+        if (authProvider.errorMessage != null) {
+          setState(() {
+            _errorMessage = authProvider.errorMessage;
+            _isLoading = false;
+          });
+          HapticFeedback.lightImpact();
+        } else {
+          HapticFeedback.mediumImpact();
+          // Après inscription: OTP requis avant accès
+          _showOtpDialog(authProvider);
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -181,6 +258,43 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
+  void _showOtpDialog(AuthProvider authProvider) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => OtpVerificationDialog(
+        email: authProvider.otpEmail ?? '',
+        onResend: () async {
+          await authProvider.resendOtp();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Code renvoyé avec succès'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        onSubmit: (code) async {
+          //await authProvider.verifyOtp(code);
+          if (!mounted) return;
+
+          if (authProvider.errorMessage != null) {
+            setState(() => _errorMessage = authProvider.errorMessage);
+            HapticFeedback.lightImpact();
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pop();
+            HapticFeedback.mediumImpact();
+            // Après inscription et vérification OTP, rediriger vers onboarding
+            // L'onboarding redirigera ensuite vers KYC
+            context.go('/onboarding');
+          }
+        },
+      ),
+    );
+  }
+
   Future<void> _handleBiometricAuth() async {
     HapticFeedback.selectionClick();
     // TODO: Implémenter l'authentification biométrique
@@ -190,6 +304,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         behavior: SnackBarBehavior.floating,
       ),
     );
+
+    if (mounted) {
+      HapticFeedback.mediumImpact();
+      // Rediriger vers KYC ou Dashboard selon le statut du profil
+      await KycRedirection.redirectAfterLogin(context);
+    }
   }
 
   Future<void> _handleForgotPassword() async {
@@ -234,7 +354,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                               ),
                               child: Icon(
@@ -250,15 +370,17 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                             style: AppTypography.headline2.copyWith(
                               color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: -0.5,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.spacing2),
                           Text(
                             _isLogin
-                                ? 'Connectez-vous pour accéder à votre identité numérique'
-                                : 'Créez votre compte pour commencer',
+                                ? 'Accédez à vos documents et services en toute sécurité'
+                                : 'Créez votre identité numérique et gérez vos documents',
                             style: AppTypography.bodyLarge.copyWith(
                               color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              height: 1.4,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -273,10 +395,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.spacing3),
                         decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.1),
+                          color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                           border: Border.all(
-                            color: AppColors.error.withOpacity(0.3),
+                            color: AppColors.error.withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -302,38 +424,20 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       const SizedBox(height: AppSpacing.spacing4),
                     ],
                 
-                    // Sélection Connexion/Inscription
-                    _SegmentedControl(
-                      isFirstSelected: _isLogin,
-                      firstLabel: 'Connexion',
-                      secondLabel: 'Inscription',
-                      onChanged: (isFirst) {
-                        setState(() {
-                          _isLogin = isFirst;
-                          _errorMessage = null;
-                          _animationController.reset();
-                          _animationController.forward();
-                        });
-                        HapticFeedback.selectionClick();
-                      },
-                      isDark: isDark,
-                    ),
-                
-                    const SizedBox(height: AppSpacing.spacing6),
-
-                    // Sélection Email/Téléphone
-                    _SegmentedControl(
-                      isFirstSelected: _isEmail,
-                      firstLabel: 'Email',
-                      secondLabel: 'Téléphone',
-                      firstIcon: Icons.email_outlined,
-                      secondIcon: Icons.phone_outlined,
-                      onChanged: (isFirst) {
-                        _toggleInputType();
-                        HapticFeedback.selectionClick();
-                      },
-                      isDark: isDark,
-                    ),
+                    // Sélection Email/Téléphone (login uniquement)
+                    if (_isLogin)
+                      InputTypeSegmentedControl(
+                        isFirstSelected: _isEmail,
+                        firstLabel: 'Email',
+                        secondLabel: 'Téléphone',
+                        firstIcon: Icons.email_outlined,
+                        secondIcon: Icons.phone_outlined,
+                        onChanged: (isFirst) {
+                          _toggleInputType();
+                          HapticFeedback.selectionClick();
+                        },
+                        isDark: isDark,
+                      ),
 
                     const SizedBox(height: AppSpacing.spacing6),
                 
@@ -344,27 +448,124 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SezamTextField(
-                            hint: _isEmail ? 'votre@email.com' : '+33 6 12 34 56 78',
-                            controller: _emailController,
-                            focusNode: _emailFocusNode,
-                            keyboardType: _isEmail ? TextInputType.emailAddress : TextInputType.phone,
-                            textInputAction: TextInputAction.next,
-                            onFieldSubmitted: (_) {
-                              FocusScope.of(context).requestFocus(_passwordFocusNode);
-                            },
-                            validator: _isEmail
-                                ? (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Veuillez entrer votre email';
-                                    }
-                                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                      return 'Veuillez entrer un email valide';
-                                    }
-                                    return null;
+                          if (!_isLogin) ...[
+                            SezamTextField(
+                              key: const ValueKey('firstNameField'),
+                              hint: 'Prénom',
+                              controller: _firstNameController,
+                              focusNode: _firstNameFocusNode,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) {
+                                FocusScope.of(context).requestFocus(_lastNameFocusNode);
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Veuillez entrer votre prénom';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.spacing4),
+                            SezamTextField(
+                              key: const ValueKey('lastNameField'),
+                              hint: 'Nom',
+                              controller: _lastNameController,
+                              focusNode: _lastNameFocusNode,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) {
+                                FocusScope.of(context).requestFocus(_emailFocusNode);
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Veuillez entrer votre nom';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.spacing4),
+                            // Email obligatoire pour l'inscription
+                            SezamTextField(
+                              key: const ValueKey('emailFieldSignup'),
+                              hint: 'votre@email.com',
+                              controller: _emailController,
+                              focusNode: _emailFocusNode,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) {
+                                FocusScope.of(context).requestFocus(_phoneFocusNode);
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Veuillez entrer votre email';
+                                }
+                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                  return 'Veuillez entrer un email valide';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.spacing4),
+                            // Téléphone (optionnel) avec indicatif
+                            PhoneInputField(
+                              key: const ValueKey('phoneFieldSignup'),
+                              controller: _phoneController,
+                              focusNode: _phoneFocusNode,
+                              onSubmitted: () {
+                                FocusScope.of(context).requestFocus(_passwordFocusNode);
+                              },
+                              onChanged: (value) {
+                                setState(() {
+                                  _signupPhone = value;
+                                });
+                              },
+                              validator: (value) {
+                                // Optionnel: si vide OK, sinon vérifier longueur min
+                                if (value == null || value.trim().isEmpty) return null;
+                                if (value.replaceAll(RegExp(r'\D'), '').length < 8) {
+                                  return 'Veuillez entrer un numéro de téléphone valide';
+                                }
+                                return null;
+                              },
+                              isDark: isDark,
+                            ),
+                            const SizedBox(height: AppSpacing.spacing4),
+                          ],
+
+                          // Champs d'identifiant pour connexion
+                          if (_isLogin) ...[
+                            if (_isEmail)
+                              SezamTextField(
+                                key: const ValueKey('emailField'),
+                                hint: 'votre@email.com',
+                                controller: _emailController,
+                                focusNode: _emailFocusNode,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                onSubmitted: (_) {
+                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                },
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) {
+                                    return 'Veuillez entrer votre email';
                                   }
-                                : _validatePhone,
-                          ),
+                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                    return 'Veuillez entrer un email valide';
+                                  }
+                                  return null;
+                                },
+                              )
+                            else
+                              PhoneInputField(
+                                key: const ValueKey('phoneField'),
+                                controller: _emailController,
+                                focusNode: _emailFocusNode,
+                                onSubmitted: () {
+                                  FocusScope.of(context).requestFocus(_passwordFocusNode);
+                                },
+                                validator: _validatePhone,
+                                isDark: isDark,
+                              ),
+                          ],
 
                           const SizedBox(height: AppSpacing.spacing4),
 
@@ -374,7 +575,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                             focusNode: _passwordFocusNode,
                             obscureText: _obscurePassword,
                             textInputAction: _isLogin ? TextInputAction.done : TextInputAction.next,
-                            onFieldSubmitted: (_) {
+                            onSubmitted: (_) {
                               if (_isLogin) {
                                 _handleAuth();
                               } else {
@@ -399,7 +600,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                           // Password strength indicator for signup
                           if (!_isLogin && _passwordController.text.isNotEmpty) ...[
                             const SizedBox(height: AppSpacing.spacing2),
-                            _PasswordStrengthIndicator(
+                            PasswordStrengthIndicator(
                               strength: _getPasswordStrength(_passwordController.text),
                               isDark: isDark,
                             ),
@@ -414,7 +615,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                               focusNode: _confirmPasswordFocusNode,
                               obscureText: _obscureConfirmPassword,
                               textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _handleAuth(),
+                              onSubmitted: (_) => _handleAuth(),
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
@@ -448,23 +649,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     if (_isLogin) ...[
                       Row(
                         children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: (value) {
-                              setState(() {
-                                _rememberMe = value ?? false;
-                              });
-                              HapticFeedback.selectionClick();
-                            },
-                            activeColor: AppColors.primary,
-                          ),
-                          Text(
-                            'Se souvenir de moi',
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const Spacer(),
                           TextButton(
                             onPressed: _handleForgotPassword,
                             child: Text(
@@ -535,188 +719,5 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         ),
       ),
     );
-  }
-}
-
-// Helper widget for segmented control
-class _SegmentedControl extends StatelessWidget {
-  final bool isFirstSelected;
-  final String firstLabel;
-  final String secondLabel;
-  final IconData? firstIcon;
-  final IconData? secondIcon;
-  final Function(bool) onChanged;
-  final bool isDark;
-
-  const _SegmentedControl({
-    required this.isFirstSelected,
-    required this.firstLabel,
-    required this.secondLabel,
-    required this.onChanged,
-    required this.isDark,
-    this.firstIcon,
-    this.secondIcon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.gray800 : AppColors.gray100,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(true),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(
-                  vertical: firstIcon != null ? AppSpacing.spacing3 : AppSpacing.spacing2,
-                ),
-                decoration: BoxDecoration(
-                  color: isFirstSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  boxShadow: isFirstSelected ? AppSpacing.shadowSm : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (firstIcon != null) ...[
-                      Icon(
-                        firstIcon,
-                        size: 16,
-                        color: isFirstSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      ),
-                      const SizedBox(width: AppSpacing.spacing2),
-                    ],
-                    Text(
-                      firstLabel,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: isFirstSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                        fontWeight: isFirstSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onChanged(false),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(
-                  vertical: secondIcon != null ? AppSpacing.spacing3 : AppSpacing.spacing2,
-                ),
-                decoration: BoxDecoration(
-                  color: !isFirstSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                  boxShadow: !isFirstSelected ? AppSpacing.shadowSm : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (secondIcon != null) ...[
-                      Icon(
-                        secondIcon,
-                        size: 16,
-                        color: !isFirstSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      ),
-                      const SizedBox(width: AppSpacing.spacing2),
-                    ],
-                    Text(
-                      secondLabel,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: !isFirstSelected
-                            ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                        fontWeight: !isFirstSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Enum for password strength
-enum PasswordStrength {
-  none,
-  weak,
-  medium,
-  strong,
-}
-
-// Helper widget for password strength indicator
-class _PasswordStrengthIndicator extends StatelessWidget {
-  final PasswordStrength strength;
-  final bool isDark;
-
-  const _PasswordStrengthIndicator({
-    required this.strength,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final strengthData = _getStrengthData();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: LinearProgressIndicator(
-                value: strengthData.progress,
-                backgroundColor: isDark ? AppColors.gray700 : AppColors.gray200,
-                valueColor: AlwaysStoppedAnimation<Color>(strengthData.color),
-                minHeight: 4,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.spacing2),
-            Text(
-              strengthData.label,
-              style: AppTypography.bodySmall.copyWith(
-                color: strengthData.color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        if (strength != PasswordStrength.none && strength != PasswordStrength.strong) ...[
-          const SizedBox(height: AppSpacing.spacing1),
-          Text(
-            'Ajoutez des majuscules, chiffres et caractères spéciaux',
-            style: AppTypography.caption.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  ({double progress, Color color, String label}) _getStrengthData() {
-    return switch (strength) {
-      PasswordStrength.none => (progress: 0.0, color: AppColors.gray400, label: ''),
-      PasswordStrength.weak => (progress: 0.33, color: AppColors.error, label: 'Faible'),
-      PasswordStrength.medium => (progress: 0.66, color: AppColors.warning, label: 'Moyen'),
-      PasswordStrength.strong => (progress: 1.0, color: AppColors.success, label: 'Fort'),
-    };
   }
 }

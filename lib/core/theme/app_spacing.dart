@@ -26,6 +26,13 @@ class AppSpacing {
   static const double radiusXl = 20.0;
   static const double radius2xl = 24.0;
   static const double radius3xl = 32.0;
+  static const double radius4xl = 40.0;
+  static const double radius5xl = 48.0;
+  static const double radius6xl = 56.0;
+  static const double radius7xl = 64.0;
+  static const double radius8xl = 72.0;
+  static const double radius9xl = 80.0;
+  static const double radius10xl = 88.0;
   static const double radiusFull = 9999.0;
   
   // Ombres

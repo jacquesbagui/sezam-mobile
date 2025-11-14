@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/sezam_button.dart';
+import '../../core/services/token_storage_service.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/profile_provider.dart';
 
 /// Écran d'onboarding de l'application SEZAM
 class OnboardingScreen extends StatefulWidget {
@@ -50,19 +54,65 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _nextPage() {
+  void _nextPage() async {
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
         duration: AppSpacing.animationNormal,
         curve: AppSpacing.animationCurve,
       );
     } else {
-      context.go('/auth');
+      // Marquer que l'onboarding a été vu
+      await TokenStorageService.instance.setHasSeenOnboarding(true);
+      if (mounted) {
+        // Après onboarding, vérifier si l'utilisateur est connecté
+        // Si oui, rediriger vers KYC ou Dashboard selon le statut du profil
+        // Si non, rediriger vers auth
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        if (authProvider.isAuthenticated) {
+          // Utilisateur connecté, vérifier le statut du profil
+          final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+          await profileProvider.loadProfileStatus();
+          
+          if (!mounted) return;
+          
+          // Rediriger vers KYC si le profil n'est pas complet, sinon vers dashboard
+          if (!profileProvider.isComplete) {
+            context.go('/kyc');
+          } else {
+            context.go('/dashboard');
+          }
+        } else {
+          context.go('/auth');
+        }
+      }
     }
   }
 
-  void _skipOnboarding() {
-    context.go('/auth');
+  void _skipOnboarding() async {
+    // Marquer que l'onboarding a été vu
+    await TokenStorageService.instance.setHasSeenOnboarding(true);
+    if (mounted) {
+      // Après skip onboarding, vérifier si l'utilisateur est connecté
+      // Si oui, rediriger vers KYC ou Dashboard selon le statut du profil
+      // Si non, rediriger vers auth
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.isAuthenticated) {
+        // Utilisateur connecté, vérifier le statut du profil
+        final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+        await profileProvider.loadProfileStatus();
+        
+        if (!mounted) return;
+        
+        // Rediriger vers KYC si le profil n'est pas complet, sinon vers dashboard
+        if (!profileProvider.isComplete) {
+          context.go('/kyc');
+        } else {
+          context.go('/dashboard');
+        }
+      } else {
+        context.go('/auth');
+      }
+    }
   }
 
   @override
@@ -179,7 +229,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: page.color.withOpacity(0.1),
+              color: page.color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppSpacing.radius2xl),
             ),
             child: Icon(

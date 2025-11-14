@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../providers/consent_provider.dart';
+import '../providers/notification_provider.dart';
 
 /// Navigation principale de l'application SEZAM
 class SezamBottomNavigation extends StatelessWidget {
@@ -31,50 +34,54 @@ class SezamBottomNavigation extends StatelessWidget {
           ),
         ),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.spacing4,
-            vertical: AppSpacing.spacing2,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                context,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home,
-                label: 'Accueil',
-                index: 0,
-                isActive: currentIndex == 0,
-              ),
-              _buildNavItem(
-                context,
-                icon: Icons.description_outlined,
-                activeIcon: Icons.description,
-                label: 'Documents',
-                index: 1,
-                isActive: currentIndex == 1,
-              ),
-              _buildNavItem(
-                context,
-                icon: Icons.notifications_outlined,
-                activeIcon: Icons.notifications,
-                label: 'Demandes',
-                index: 2,
-                isActive: currentIndex == 2,
-                hasNotification: true,
-              ),
-              _buildNavItem(
-                context,
-                icon: Icons.person_outline,
-                activeIcon: Icons.person,
-                label: 'Profil',
-                index: 3,
-                isActive: currentIndex == 3,
-              ),
-            ],
-          ),
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppSpacing.spacing4,
+          right: AppSpacing.spacing4,
+          top: AppSpacing.spacing2,
+          bottom: MediaQuery.of(context).padding.bottom + AppSpacing.spacing2,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(
+              context,
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home,
+              label: 'Accueil',
+              index: 0,
+              isActive: currentIndex == 0,
+            ),
+            _buildNavItem(
+              context,
+              icon: Icons.description_outlined,
+              activeIcon: Icons.description,
+              label: 'Documents',
+              index: 1,
+              isActive: currentIndex == 1,
+            ),
+            Consumer<ConsentProvider>(
+              builder: (context, consentProvider, child) {
+                return _buildNavItem(
+                  context,
+                  icon: Icons.request_page_outlined,
+                  activeIcon: Icons.request_page,
+                  label: 'Demandes',
+                  index: 2,
+                  isActive: currentIndex == 2,
+                  hasNotification: consentProvider.pendingConsents.isNotEmpty,
+                );
+              },
+            ),
+            _buildNavItem(
+              context,
+              icon: Icons.person_outline,
+              activeIcon: Icons.person,
+              label: 'Profil',
+              index: 4,
+              isActive: currentIndex == 4,
+            ),
+          ],
         ),
       ),
     );
@@ -88,6 +95,7 @@ class SezamBottomNavigation extends StatelessWidget {
     required int index,
     required bool isActive,
     bool hasNotification = false,
+    int? notificationCount,
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;

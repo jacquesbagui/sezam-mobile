@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/providers/auth_provider.dart';
+import '../../core/providers/profile_provider.dart';
+import '../../core/services/token_storage_service.dart';
 
 /// Écran de splash screen de l'application SEZAM
 class SplashScreen extends StatefulWidget {
@@ -48,9 +52,81 @@ class _SplashScreenState extends State<SplashScreen>
   void _startAnimation() async {
     await _animationController.forward();
     await Future.delayed(const Duration(milliseconds: 1000));
+    
     if (mounted) {
-      context.go('/onboarding');
+      // Attendre que le provider charge l'utilisateur depuis le stockage
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Attendre que l'initialisation soit terminée
+      await authProvider.waitForInitialization();
+      
+      if (!mounted) return;
+      
+      // Débug : vérifier l'état d'authentification
+      print('🔐 AuthProvider state:');
+      print('  - isAuthenticated: ${authProvider.isAuthenticated}');
+      print('  - currentUser: ${authProvider.currentUser?.email ?? 'null'}');
+      print('  - token: ${authProvider.currentUser != null ? 'exists' : 'null'}');
+      
+      // Vérifier si l'utilisateur est connecté
+      if (authProvider.isAuthenticated) {
+        // Vérifier si l'onboarding a déjà été vu
+        final hasSeenOnboarding = await TokenStorageService.instance.hasSeenOnboarding();
+        print('🔐 hasSeenOnboarding: $hasSeenOnboarding');
+        
+        if (!mounted) return;
+        
+        // Si l'onboarding n'a pas été vu, rediriger vers l'onboarding
+        if (!hasSeenOnboarding) {
+          context.go('/onboarding');
+          return;
+        }
+        
+        // Utilisateur connecté, vérifier le statut du profil KYC
+        final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+        await profileProvider.loadProfileStatus();
+        
+        if (!mounted) return;
+        
+        // Si le KYC est complet (is_complete = true), aller au dashboard
+        // Peu importe si le profil est validé par l'admin ou non
+        if (profileProvider.isComplete) {
+          context.go('/dashboard');
+          return;
+        }
+        
+        // Règle locale minimale: champs requis + pièce d'identité
+        final meetsMinimum = _meetsKycMinimum(context, profileProvider);
+        if (!meetsMinimum) {
+          context.go('/kyc');
+        } else {
+          context.go('/dashboard');
+        }
+      } else {
+        // Vérifier si l'onboarding a déjà été vu
+        final hasSeenOnboarding = await TokenStorageService.instance.hasSeenOnboarding();
+        
+        if (!mounted) return;
+        
+        if (hasSeenOnboarding) {
+          // Onboarding déjà vu, aller directement à l'authentification
+          context.go('/auth');
+        } else {
+          // Premier lancement, afficher Reviewboarding
+          context.go('/onboarding');
+        }
+      }
     }
+  }
+
+  bool _meetsKycMinimum(BuildContext context, ProfileProvider profileProvider) {
+    // Vérifier uniquement les champs requis pour le KYC
+    // Les champs requis pour le KYC sont : birth_date, birth_place, gender_id, nationality_id,
+    // address_line1, city, country_id, occupation
+    final missingFields = profileProvider.missingFields;
+    
+    // Si tous les champs requis pour le KYC sont remplis, le minimum est atteint
+    return missingFields.isEmpty;
   }
 
   @override

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "5879426794",
+    "project_id": "sezam-88792",
+    "storage_bucket": "sezam-88792.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:5879426794:android:9ae03b74bef0b0697f3193",
+        "android_client_info": {
+          "package_name": "com.example.sezam"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbYIuqaGXbTMDJAwu7vwjQ4wBfSBN6_uM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:5879426794:android:734b81ecc6df4b7c7f3193",
+        "android_client_info": {
+          "package_name": "com.sezam.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBbYIuqaGXbTMDJAwu7vwjQ4wBfSBN6_uM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -39,10 +39,14 @@ class AppColors {
   static const Color gray800 = Color(0xFF1F2937);
   static const Color gray900 = Color(0xFF111827);
   
+  // Couleurs de bordure
+  static const Color borderLight = gray300;
+  static const Color borderDark = gray700;
+  
   // Couleurs avec opacité
-  static Color primaryWithOpacity(double opacity) => primary.withOpacity(opacity);
-  static Color secondaryWithOpacity(double opacity) => secondary.withOpacity(opacity);
-  static Color errorWithOpacity(double opacity) => error.withOpacity(opacity);
-  static Color warningWithOpacity(double opacity) => warning.withOpacity(opacity);
-  static Color successWithOpacity(double opacity) => success.withOpacity(opacity);
+  static Color primaryWithOpacity(double opacity) => primary.withValues(alpha: opacity);
+  static Color secondaryWithOpacity(double opacity) => secondary.withValues(alpha: opacity);
+  static Color errorWithOpacity(double opacity) => error.withValues(alpha: opacity);
+  static Color warningWithOpacity(double opacity) => warning.withValues(alpha: opacity);
+  static Color successWithOpacity(double opacity) => success.withValues(alpha: opacity);
 }
