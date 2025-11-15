@@ -265,6 +265,7 @@ class DocumentService {
         fromJson: (json) => json,
       );
       final data = resp.data;
+      print('🔍 getRequiredDocuments: $data');
       if (data == null) return [];
       final list = data['required_documents'];
       if (list is List) {

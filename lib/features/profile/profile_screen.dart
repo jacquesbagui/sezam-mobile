@@ -92,6 +92,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 240), // Espace pour la carte superposée
                   _buildProfileProgressSection(),
                   const SizedBox(height: AppSpacing.spacing6),
+                  _buildMissingFieldsSection(),
+                  const SizedBox(height: AppSpacing.spacing6),
                   _buildPersonalInfoSection(),
                   const SizedBox(height: AppSpacing.spacing4),
                   _buildSecuritySection(),
@@ -164,17 +166,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               textAlign: TextAlign.center,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.white),
-            onPressed: _openSettings,
-            tooltip: 'Paramètres',
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: () {
-              // TODO: Naviguer vers l'édition du profil
-            },
           ),
         ],
       ),
@@ -444,6 +435,330 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  Widget _buildMissingFieldsSection() {
+    return Consumer<ProfileProvider>(
+      builder: (context, profileProvider, child) {
+        // Utiliser les noms d'affichage en français
+        final missingFields = profileProvider.missingFieldsDisplay;
+        final missingFieldsRaw = profileProvider.missingFields;
+        final isComplete = profileProvider.isComplete;
+        
+        // Debug logs
+        print('🔍 _buildMissingFieldsSection:');
+        print('   - isLoading: ${profileProvider.isLoading}');
+        print('   - isComplete: $isComplete');
+        print('   - missingFields (raw): $missingFieldsRaw');
+        print('   - missingFields (display): $missingFields');
+        print('   - profileStatus: ${profileProvider.profileStatus != null}');
+        if (profileProvider.profileStatus != null) {
+          print('   - completionPercentage: ${profileProvider.profileStatus!.completionPercentage}%');
+        }
+        
+        // Si le profil est en cours de chargement, afficher un indicateur
+        if (profileProvider.isLoading) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.spacing4),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+        
+        // Afficher si il y a des champs manquants
+        // Note: On affiche même si isComplete est true, car l'utilisateur peut avoir validé le KYC
+        // mais avoir des champs optionnels manquants
+        if (missingFields.isEmpty && missingFieldsRaw.isEmpty) {
+          print('   - Section masquée: aucun champ manquant');
+          return const SizedBox.shrink();
+        }
+        
+        // Si missingFieldsDisplay est vide mais missingFieldsRaw ne l'est pas,
+        // c'est qu'il y a un problème de mapping
+        final fieldsToDisplay = missingFields.isNotEmpty 
+            ? missingFields 
+            : missingFieldsRaw.map((f) => f.replaceAll('_', ' ').split(' ').map((w) => 
+                w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join(' ')).toList();
+        
+        print('   - Section affichée avec ${fieldsToDisplay.length} champs manquants: $fieldsToDisplay');
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.spacing4),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(
+                color: AppColors.warning.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.warning,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppSpacing.spacing3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Champs à compléter',
+                            style: AppTypography.bodyLarge.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.spacing1),
+                          Text(
+                            'Complétez ces informations pour finaliser votre profil.',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.gray700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.spacing4),
+                // Liste des champs manquants avec boutons pour les mettre à jour
+                ...fieldsToDisplay.map((fieldName) => _buildMissingFieldItem(fieldName)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Construire un item pour un champ manquant avec bouton de mise à jour
+  Widget _buildMissingFieldItem(String fieldName) {
+    final fieldMapping = _getFieldMapping(fieldName);
+    if (fieldMapping == null) {
+      // Si on ne peut pas mapper le champ, afficher juste le nom
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.spacing2),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, size: 16, color: AppColors.warning),
+            const SizedBox(width: AppSpacing.spacing2),
+            Expanded(
+              child: Text(
+                fieldName,
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.gray700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.spacing2),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          border: Border.all(
+            color: AppColors.warning.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        child: ListTile(
+          dense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.spacing3,
+            vertical: AppSpacing.spacing1,
+          ),
+          leading: Icon(
+            Icons.edit_outlined,
+            size: 18,
+            color: AppColors.warning,
+          ),
+          title: Text(
+            fieldName,
+            style: AppTypography.bodySmall.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimaryLight,
+            ),
+          ),
+          trailing: Icon(
+            Icons.arrow_forward_ios,
+            size: 14,
+            color: AppColors.gray400,
+          ),
+          onTap: () => _editMissingField(fieldMapping),
+        ),
+      ),
+    );
+  }
+
+  /// Mapper le nom d'affichage du champ vers les informations nécessaires pour l'édition
+  Map<String, dynamic>? _getFieldMapping(String fieldName) {
+    // Mapping des noms d'affichage vers les fieldKeys et types
+    // Ces noms correspondent à ceux retournés par le backend
+    final mappings = {
+      'Email': {
+        'fieldKey': 'email',
+        'label': 'Email',
+        'fieldType': FieldType.email,
+      },
+      'Téléphone': {
+        'fieldKey': 'phone',
+        'label': 'Téléphone',
+        'fieldType': FieldType.phone,
+      },
+      'Date de naissance': {
+        'fieldKey': 'birth_date',
+        'label': 'Date de naissance',
+        'fieldType': FieldType.date,
+      },
+      'Genre': {
+        'fieldKey': 'gender_id',
+        'label': 'Genre',
+        'fieldType': FieldType.select,
+      },
+      'Adresse': {
+        'fieldKey': 'address_line1',
+        'label': 'Adresse',
+        'fieldType': FieldType.text,
+      },
+      'Adresse principale': {
+        'fieldKey': 'address_line1',
+        'label': 'Adresse',
+        'fieldType': FieldType.text,
+      },
+      'Ville': {
+        'fieldKey': 'city',
+        'label': 'Ville',
+        'fieldType': FieldType.text,
+      },
+      'Pays': {
+        'fieldKey': 'country_id',
+        'label': 'Pays',
+        'fieldType': FieldType.select,
+      },
+      'Nationalité': {
+        'fieldKey': 'nationality_id',
+        'label': 'Nationalité',
+        'fieldType': FieldType.select,
+      },
+      'Profession': {
+        'fieldKey': 'occupation',
+        'label': 'Profession',
+        'fieldType': FieldType.text,
+      },
+      'Lieu de naissance': {
+        'fieldKey': 'birth_place',
+        'label': 'Lieu de naissance',
+        'fieldType': FieldType.text,
+      },
+      'Employeur': {
+        'fieldKey': 'employer',
+        'label': 'Employeur',
+        'fieldType': FieldType.text,
+      },
+      'Revenu annuel': {
+        'fieldKey': 'annual_income',
+        'label': 'Revenu annuel',
+        'fieldType': FieldType.text,
+      },
+      'Source de revenu': {
+        'fieldKey': 'income_source_id',
+        'label': 'Source de revenu',
+        'fieldType': FieldType.select,
+      },
+      'Prénom': {
+        'fieldKey': 'first_name',
+        'label': 'Prénom',
+        'fieldType': FieldType.text,
+      },
+      'Nom': {
+        'fieldKey': 'last_name',
+        'label': 'Nom',
+        'fieldType': FieldType.text,
+      },
+      'Nom complet': {
+        'fieldKey': 'first_name', // On commence par le prénom
+        'label': 'Prénom',
+        'fieldType': FieldType.text,
+      },
+      'Documents d\'identité': {
+        'fieldKey': null, // Les documents sont gérés différemment
+        'label': 'Documents',
+        'fieldType': FieldType.text,
+      },
+      'Numéro de document': {
+        'fieldKey': null, // Les documents sont gérés différemment
+        'label': 'Numéro de document',
+        'fieldType': FieldType.text,
+      },
+    };
+
+    final mapping = mappings[fieldName];
+    // Si le fieldKey est null, on ne peut pas éditer ce champ depuis ici
+    if (mapping != null && mapping['fieldKey'] == null) {
+      return null;
+    }
+    return mapping;
+  }
+
+  /// Éditer un champ manquant
+  Future<void> _editMissingField(Map<String, dynamic> fieldMapping) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    // Récupérer la valeur initiale du champ
+    String? initialValue;
+    if (fieldMapping['fieldKey'] == 'email') {
+      initialValue = user?.email;
+    } else if (fieldMapping['fieldKey'] == 'phone') {
+      initialValue = user?.phone;
+    } else if (user?.profile != null) {
+      final profile = user!.profile!;
+      final fieldKey = fieldMapping['fieldKey'] as String;
+      initialValue = profile[fieldKey]?.toString();
+    }
+
+    // Naviguer vers l'écran d'édition
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileFieldScreen(
+          fieldKey: fieldMapping['fieldKey'] as String,
+          label: fieldMapping['label'] as String,
+          initialValue: initialValue,
+          fieldType: fieldMapping['fieldType'] as FieldType,
+        ),
+      ),
+    );
+
+    // Si la mise à jour a réussi, recharger le statut du profil
+    if (result == true && mounted) {
+      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Recharger l'utilisateur et le statut du profil
+      await authProvider.refreshUser();
+      await profileProvider.loadProfileStatus();
+      
+      // Rafraîchir l'interface
+      if (mounted) {
+        setState(() {});
+      }
+    }
   }
 
   Widget _buildPersonalInfoSection() {

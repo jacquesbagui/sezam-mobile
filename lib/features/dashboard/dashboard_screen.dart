@@ -13,7 +13,6 @@ import 'package:sezam/core/providers/notification_provider.dart';
 import 'package:sezam/features/documents/documents_screen.dart';
 import 'package:sezam/features/requests/requests_screen.dart';
 import 'package:sezam/features/profile/profile_screen.dart';
-import 'package:sezam/features/qr_scanner/qr_scanner_screen.dart';
 import 'package:sezam/features/connections/connections_screen.dart';
 import 'package:sezam/features/notifications/notifications_screen.dart';
 import 'package:sezam/core/models/user_model.dart';
@@ -54,7 +53,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onNavigateToDocuments: () => setState(() => _currentIndex = 1),
                     onNavigateToRequests: () => setState(() => _currentIndex = 2),
                     onShowConnections: _showConnectionsInfo,
-                    onOpenQRScanner: _openQRScanner,
                     onShowAlerts: _showAlertsInfo,
                     onNavigateToNotifications: () => setState(() => _currentIndex = 3),
                   ),
@@ -178,29 +176,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Ouvrir le scanner QR
-  void _openQRScanner() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const QRScannerScreen(),
-      ),
-    );
-    
-    if (result != null && result is Map<String, dynamic>) {
-      final bool connected = result['connected'] as bool;
-      final String organization = result['organization'] as String;
-      
-      if (connected && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Connexion avec $organization établie avec succès'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    }
-  }
 }
 
 /// Écran d'accueil du dashboard
@@ -208,7 +183,6 @@ class DashboardHomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToDocuments;
   final VoidCallback onNavigateToRequests;
   final VoidCallback onShowConnections;
-  final VoidCallback onOpenQRScanner;
   final VoidCallback onShowAlerts;
   final VoidCallback onNavigateToNotifications;
   
@@ -217,7 +191,6 @@ class DashboardHomeScreen extends StatefulWidget {
     required this.onNavigateToDocuments,
     required this.onNavigateToRequests,
     required this.onShowConnections,
-    required this.onOpenQRScanner,
     required this.onShowAlerts,
     required this.onNavigateToNotifications,
   });
@@ -502,10 +475,80 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         final isProfileVerified = profile != null && profile['verified_at'] != null;
         final hasUserCode = user.userCode != null;
         final isKycComplete = profileProvider.isComplete;
+        final completionPercentage = profileProvider.completionPercentage;
         final missingFields = profileProvider.missingFields;
+        final profileStatus = profileProvider.profileStatus;
+
+        print('🔍 _buildProfileStatusBanner:');
+        print('   - isKycComplete: $isKycComplete');
+        print('   - completionPercentage: $completionPercentage');
+        print('   - missingFields: $missingFields');
+        print('   - profileStatus: $profileStatus');
+        print('   - isProfileVerified: $isProfileVerified');
+        print('   - hasUserCode: $hasUserCode');
         
-        // Si tout est OK, ne rien afficher
-        if (isKycComplete && isProfileVerified && hasUserCode) {
+        // Si le statut est en cours de chargement, afficher un message générique
+        if (profileProvider.isLoading || profileStatus == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing6),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.spacing4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    ),
+                    child: const Icon(
+                      Icons.refresh,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.spacing3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Chargement du profil...',
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: AppColors.textPrimaryLight,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Vérification de votre profil en cours',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.textSecondaryLight,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // Si tout est OK (100% complété ET vérifié ET code généré), ne rien afficher
+        // IMPORTANT: Vérifier le pourcentage en premier, car isKycComplete peut être true même à < 100%
+        if (completionPercentage >= 100 && isProfileVerified && hasUserCode) {
           return const SizedBox.shrink();
         }
         
@@ -517,11 +560,20 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         IconData icon;
         Color accentColor;
         
-        if (!isKycComplete) {
+        // Afficher la bannière si le profil n'est pas complet (< 100%)
+        // Priorité 1: Pourcentage < 100%
+        if (completionPercentage < 100) {
           title = 'Profil incomplet';
-          message = missingFields.isNotEmpty
-              ? '${missingFields.length} champ${missingFields.length > 1 ? 's' : ''} manquant${missingFields.length > 1 ? 's' : ''}'
-              : 'Finalisez votre profil';
+          if (completionPercentage > 0) {
+            message = 'Votre profil est complété à $completionPercentage%';
+            if (missingFields.isNotEmpty) {
+              message += ' - ${missingFields.length} champ${missingFields.length > 1 ? 's' : ''} manquant${missingFields.length > 1 ? 's' : ''}';
+            }
+          } else {
+            message = missingFields.isNotEmpty
+                ? '${missingFields.length} champ${missingFields.length > 1 ? 's' : ''} manquant${missingFields.length > 1 ? 's' : ''}'
+                : 'Finalisez votre profil';
+          }
           actionLabel = 'Compléter';
           onAction = () => context.go('/profile');
           icon = Icons.person_add_outlined;

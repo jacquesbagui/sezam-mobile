@@ -62,8 +62,12 @@ void main() async {
     final pushNotificationService = PushNotificationService();
     await pushNotificationService.initialize(isAuthenticated: false);
   } catch (e) {
-    print('Erreur lors de l\'initialisation de Firebase: $e');
+    print('⚠️ Erreur lors de l\'initialisation de Firebase: $e');
     // L'app continue même si Firebase n'est pas configuré
+    // Les erreurs SERVICE_NOT_AVAILABLE sont normales sur certains émulateurs/simulateurs
+    if (e.toString().contains('SERVICE_NOT_AVAILABLE')) {
+      print('ℹ️ Firebase Messaging non disponible (normal sur certains émulateurs)');
+    }
   }
   
   runApp(const SezamApp());

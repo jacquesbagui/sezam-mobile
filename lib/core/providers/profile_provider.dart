@@ -21,8 +21,11 @@ class ProfileProvider extends ChangeNotifier {
   /// Vérifier si le profil est complet
   bool get isComplete => _profileStatus?.isComplete ?? false;
 
-  /// Obtenir les champs manquants
+  /// Obtenir les champs manquants (fieldKeys)
   List<String> get missingFields => _profileStatus?.missingFields ?? [];
+
+  /// Obtenir les champs manquants avec leurs noms d'affichage en français
+  List<String> get missingFieldsDisplay => _profileStatus?.missingFieldsDisplay ?? [];
 
   /// Obtenir les documents manquants
   List<String> get missingDocuments => _profileStatus?.missingDocuments ?? [];

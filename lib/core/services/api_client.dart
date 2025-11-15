@@ -35,13 +35,29 @@ class ApiClient {
     Map<String, String>? headers,
     T Function(Map<String, dynamic>)? fromJson,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.get(
-      uri,
-      headers: await _buildHeaders(headers),
-    );
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+      final response = await http.get(
+        uri,
+        headers: await _buildHeaders(headers),
+      ).timeout(
+        ApiConfig.receiveTimeout,
+        onTimeout: () {
+          throw ApiException('Délai d\'attente dépassé lors de la connexion au serveur');
+        },
+      );
 
-    return _handleResponse<T>(response, fromJson);
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException catch (e) {
+      throw ApiException('Impossible de se connecter au serveur: ${e.message}');
+    } on HttpException catch (e) {
+      throw ApiException('Erreur HTTP: ${e.message}');
+    } on FormatException catch (e) {
+      throw ApiException('Erreur de format: ${e.message}');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur de connexion: ${e.toString()}');
+    }
   }
 
   /// Méthode générique pour les requêtes POST
@@ -51,14 +67,30 @@ class ApiClient {
     dynamic body,
     T Function(Map<String, dynamic>)? fromJson,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.post(
-      uri,
-      headers: await _buildHeaders(headers),
-      body: body != null ? jsonEncode(body) : null,
-    );
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+      final response = await http.post(
+        uri,
+        headers: await _buildHeaders(headers),
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(
+        ApiConfig.receiveTimeout,
+        onTimeout: () {
+          throw ApiException('Délai d\'attente dépassé lors de la connexion au serveur');
+        },
+      );
 
-    return _handleResponse<T>(response, fromJson);
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException catch (e) {
+      throw ApiException('Impossible de se connecter au serveur: ${e.message}');
+    } on HttpException catch (e) {
+      throw ApiException('Erreur HTTP: ${e.message}');
+    } on FormatException catch (e) {
+      throw ApiException('Erreur de format: ${e.message}');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur de connexion: ${e.toString()}');
+    }
   }
 
   /// Méthode générique pour les requêtes PUT
@@ -68,14 +100,30 @@ class ApiClient {
     dynamic body,
     T Function(Map<String, dynamic>)? fromJson,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.put(
-      uri,
-      headers: await _buildHeaders(headers),
-      body: body != null ? jsonEncode(body) : null,
-    );
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+      final response = await http.put(
+        uri,
+        headers: await _buildHeaders(headers),
+        body: body != null ? jsonEncode(body) : null,
+      ).timeout(
+        ApiConfig.receiveTimeout,
+        onTimeout: () {
+          throw ApiException('Délai d\'attente dépassé lors de la connexion au serveur');
+        },
+      );
 
-    return _handleResponse<T>(response, fromJson);
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException catch (e) {
+      throw ApiException('Impossible de se connecter au serveur: ${e.message}');
+    } on HttpException catch (e) {
+      throw ApiException('Erreur HTTP: ${e.message}');
+    } on FormatException catch (e) {
+      throw ApiException('Erreur de format: ${e.message}');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur de connexion: ${e.toString()}');
+    }
   }
 
   /// Méthode générique pour les requêtes DELETE
@@ -84,13 +132,29 @@ class ApiClient {
     Map<String, String>? headers,
     T Function(Map<String, dynamic>)? fromJson,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
-    final response = await http.delete(
-      uri,
-      headers: await _buildHeaders(headers),
-    );
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+      final response = await http.delete(
+        uri,
+        headers: await _buildHeaders(headers),
+      ).timeout(
+        ApiConfig.receiveTimeout,
+        onTimeout: () {
+          throw ApiException('Délai d\'attente dépassé lors de la connexion au serveur');
+        },
+      );
 
-    return _handleResponse<T>(response, fromJson);
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException catch (e) {
+      throw ApiException('Impossible de se connecter au serveur: ${e.message}');
+    } on HttpException catch (e) {
+      throw ApiException('Erreur HTTP: ${e.message}');
+    } on FormatException catch (e) {
+      throw ApiException('Erreur de format: ${e.message}');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur de connexion: ${e.toString()}');
+    }
   }
 
   /// Construire les headers avec le token d'authentification
@@ -117,6 +181,11 @@ class ApiClient {
     T Function(Map<String, dynamic>)? fromJson,
   ) async {
     try {
+      // Vérifier si la réponse est vide
+      if (response.body.isEmpty) {
+        throw ApiException('Réponse vide du serveur', statusCode: response.statusCode);
+      }
+
       final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
 
       // Gérer les codes d'erreur
@@ -152,7 +221,12 @@ class ApiClient {
       
       // Gérer les erreurs de connexion
       if (e is SocketException) {
-        throw ApiException('Impossible de se connecter au serveur');
+        throw ApiException('Impossible de se connecter au serveur. Vérifiez votre connexion Internet.');
+      }
+      
+      if (e is FormatException) {
+        // Réponse non-JSON, peut-être une erreur HTML
+        throw ApiException('Réponse invalide du serveur (${response.statusCode})');
       }
       
       // Autres erreurs de parsing

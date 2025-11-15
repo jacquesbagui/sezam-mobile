@@ -1,7 +1,15 @@
 /// Configuration de l'API SEZAM
 class ApiConfig {
   // Base URL de l'API
-  static const String baseUrl = 'http://sezam-backend.test';
+  //static const String baseUrl = 'http://sezam-backend.test';
+  
+  // URL de production
+  static const String baseUrl = 'https://sezam-api.qalebasse.cloud';
+  
+  // IP de secours si le DNS ne fonctionne pas (à utiliser uniquement en développement)
+  // Note: Utiliser l'IP directement pose problème avec HTTPS car le certificat SSL
+  // ne correspondra pas. Utilisez uniquement si nécessaire pour le développement.
+  // static const String baseUrl = 'https://104.21.39.132'; // IP Cloudflare (ne fonctionnera pas avec HTTPS)
   
   // Endpoints
   static const String apiPrefix = '/api';
