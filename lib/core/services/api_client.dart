@@ -161,6 +161,9 @@ class ApiClient {
   Future<Map<String, String>> _buildHeaders(Map<String, String>? customHeaders) async {
     final headers = Map<String, String>.from(ApiConfig.defaultHeaders);
     
+    // S'assurer que le storage est initialisé avant de récupérer le token
+    await _tokenStorage.init();
+    
     // Ajouter le token d'authentification si disponible
     final token = _tokenStorage.getToken();
     if (token != null) {
@@ -187,10 +190,55 @@ class ApiClient {
       }
 
       final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      
+      // Log pour déboguer les réponses OTP
+      if (response.request?.url.toString().contains('/otp') ?? false) {
+        print('🔍 Réponse brute OTP: ${response.body}');
+        print('🔍 JSON parsé: $json');
+        print('🔍 Clés disponibles: ${json.keys.toList()}');
+      }
 
       // Gérer les codes d'erreur
       if (response.statusCode >= 400) {
-        final errorMessage = json['message'] as String? ?? 'Une erreur est survenue';
+        String errorMessage = json['message'] as String? ?? 'Une erreur est survenue';
+        
+        // Si c'est une erreur de validation (422), extraire les erreurs détaillées
+        if (response.statusCode == 422 && json['errors'] != null) {
+          final errors = json['errors'] as Map<String, dynamic>;
+          final errorList = <String>[];
+          
+          // Map des noms de champs pour des messages plus clairs
+          final fieldNames = {
+            'first_name': 'Prénom',
+            'last_name': 'Nom',
+            'email': 'Email',
+            'phone': 'Téléphone',
+            'password': 'Mot de passe',
+            'password_confirmation': 'Confirmation du mot de passe',
+          };
+          
+          errors.forEach((field, messages) {
+            final fieldName = fieldNames[field] ?? field;
+            if (messages is List) {
+              for (var message in messages) {
+                // Remplacer le nom du champ par un nom plus lisible
+                String msg = message.toString();
+                msg = msg.replaceAll(field, fieldName);
+                errorList.add(msg);
+              }
+            } else {
+              String msg = messages.toString();
+              msg = msg.replaceAll(field, fieldName);
+              errorList.add(msg);
+            }
+          });
+          
+          // Formater le message d'erreur
+          if (errorList.isNotEmpty) {
+            errorMessage = errorList.join('\n');
+          }
+        }
+        
         throw ApiException(
           errorMessage,
           statusCode: response.statusCode,
@@ -215,6 +263,7 @@ class ApiClient {
         data: data,
         token: json['token'] as String?,
         requiresOtp: json['requires_otp'] as bool?,
+        otpCode: json['otp_code'] as String?,
       );
     } catch (e) {
       if (e is ApiException) rethrow;

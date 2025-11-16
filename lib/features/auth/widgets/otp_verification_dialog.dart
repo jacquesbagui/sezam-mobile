@@ -8,12 +8,14 @@ class OtpVerificationDialog extends StatefulWidget {
   final String email;
   final VoidCallback onResend;
   final Function(String code) onSubmit;
+  final String? testCode; // Code OTP en mode test (optionnel)
 
   const OtpVerificationDialog({
     super.key,
     required this.email,
     required this.onResend,
     required this.onSubmit,
+    this.testCode,
   });
 
   @override
@@ -24,6 +26,26 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
+  String? _currentTestCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTestCode = widget.testCode;
+    print('🔑 OtpVerificationDialog initState - testCode: ${widget.testCode}');
+    print('🔑 _currentTestCode initialisé: $_currentTestCode');
+  }
+  
+  @override
+  void didUpdateWidget(OtpVerificationDialog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.testCode != widget.testCode) {
+      print('🔄 OtpVerificationDialog didUpdateWidget - nouveau testCode: ${widget.testCode}');
+      setState(() {
+        _currentTestCode = widget.testCode;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -56,51 +78,58 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 400),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.backgroundDark : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: keyboardHeight > 0 ? 20 : 80,
+      ),
+      child: SingleChildScrollView(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.backgroundDark : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icone avec animation
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withValues(alpha: 0.8),
-                    ],
+              // Icone avec animation (masquer si clavier ouvert)
+              if (keyboardHeight == 0)
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.primary,
+                        AppColors.primary.withValues(alpha: 0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  child: const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 40,
+                    color: Colors.white,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.lock_outline_rounded,
-                  size: 40,
-                  color: Colors.white,
-                ),
-              ),
               
-              const SizedBox(height: 24),
+              if (keyboardHeight == 0) const SizedBox(height: 24),
               
               // Titre
               Text(
@@ -108,12 +137,12 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                 style: AppTypography.headline2.copyWith(
                   color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                   fontWeight: FontWeight.bold,
-                  fontSize: 24,
+                  fontSize: keyboardHeight > 0 ? 20 : 24,
                 ),
                 textAlign: TextAlign.center,
               ),
               
-              const SizedBox(height: 8),
+              SizedBox(height: keyboardHeight > 0 ? 4 : 8),
               
               // Description
               Text(
@@ -135,7 +164,75 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                 textAlign: TextAlign.center,
               ),
               
-              const SizedBox(height: 32),
+              // Afficher le code OTP en mode test
+              Builder(
+                builder: (context) {
+                  print('🔑 Build - _currentTestCode: $_currentTestCode');
+                  print('🔑 Build - widget.testCode: ${widget.testCode}');
+                  
+                  // Utiliser widget.testCode directement si _currentTestCode est null
+                  final displayCode = _currentTestCode ?? widget.testCode;
+                  
+                  if (displayCode != null && displayCode.isNotEmpty) {
+                    print('✅ Affichage du code OTP en mode test: $displayCode');
+                    return Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withValues(alpha: 0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Mode test',
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                displayCode,
+                                style: AppTypography.headline3.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 24,
+                                  letterSpacing: 4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    print('⚠️ Aucun code OTP à afficher');
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
+              
+              SizedBox(height: keyboardHeight > 0 ? 20 : 32),
               
               // Champs de code
               Row(
@@ -272,7 +369,8 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                   ],
                 ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

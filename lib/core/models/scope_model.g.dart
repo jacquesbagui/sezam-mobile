@@ -11,16 +11,21 @@ ScopeModel _$ScopeModelFromJson(Map<String, dynamic> json) => ScopeModel(
   name: json['name'] as String,
   displayName: json['display_name'] as String,
   description: json['description'] as String?,
-  isSensitive: json['is_sensitive'] as bool,
-  requiresExplicitConsent: json['requires_explicit_consent'] as bool,
+  isSensitive: _boolFromJson(json['is_sensitive']),
+  requiresExplicitConsent: _boolFromJson(json['requires_explicit_consent']),
   fieldsIncluded: (json['fields_included'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),
   missingFields: (json['missing_fields'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),
-  hasMissingFields: json['has_missing_fields'] as bool? ?? false,
-  granted: json['granted'] as bool? ?? true,
+  hasMissingFields: json['has_missing_fields'] == null
+      ? false
+      : _boolFromJson(json['has_missing_fields']),
+  granted: json['granted'] == null ? true : _boolFromJson(json['granted']),
+  isRequired: json['is_required'] == null
+      ? false
+      : _boolFromJson(json['is_required']),
 );
 
 Map<String, dynamic> _$ScopeModelToJson(ScopeModel instance) =>
@@ -35,4 +40,5 @@ Map<String, dynamic> _$ScopeModelToJson(ScopeModel instance) =>
       'missing_fields': instance.missingFields,
       'has_missing_fields': instance.hasMissingFields,
       'granted': instance.granted,
+      'is_required': instance.isRequired,
     };

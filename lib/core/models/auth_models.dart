@@ -60,14 +60,19 @@ class RegisterRequest {
 /// Modèle pour les requêtes de vérification OTP
 @JsonSerializable()
 class VerifyOtpRequest {
-  /// Email de l'utilisateur
-  final String email;
+  /// Identifiant (email ou téléphone)
+  final String identifier;
+  
+  /// Type d'OTP
+  @JsonKey(name: 'otp_type')
+  final String otpType;
   
   /// Code OTP
   final String code;
 
   VerifyOtpRequest({
-    required this.email,
+    required this.identifier,
+    required this.otpType,
     required this.code,
   });
 

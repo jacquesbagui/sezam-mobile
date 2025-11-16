@@ -33,7 +33,7 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
       icon: Icons.person_outline,
       title: 'Informations personnelles',
       description: 'Nom, prénom, date et lieu de naissance',
-      route: '/personal-info-kyc',
+      route: '/kyc',
     ),
     KycStep(
       id: 'address',
@@ -207,7 +207,8 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
       
       if (mounted) {
         Navigator.of(context).pop();
-        context.go('/dashboard');
+        // Rediriger vers la sélection du motif d'utilisation après KYC
+        context.go('/usage-purpose');
       }
     } catch (e) {
       if (mounted) {

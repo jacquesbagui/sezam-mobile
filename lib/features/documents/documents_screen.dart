@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
@@ -7,6 +9,8 @@ import 'package:sezam/core/providers/document_provider.dart';
 import 'package:sezam/core/models/document_model.dart';
 import 'package:sezam/features/documents/add_document_screen.dart';
 import 'package:sezam/features/documents/document_detail_screen.dart';
+import 'package:sezam/core/utils/navigation_helper.dart';
+import 'package:sezam/core/services/app_event_service.dart';
 
 class DocumentsScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -20,17 +24,33 @@ class DocumentsScreen extends StatefulWidget {
 class _DocumentsScreenState extends State<DocumentsScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _hasLoaded = false;
+  StreamSubscription<AppEventType>? _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    // Charger les documents au premier affichage
+    // Charger les documents seulement si nécessaire (cache invalide)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_hasLoaded) {
         _hasLoaded = true;
         final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
-        if (!documentProvider.isLoading && documentProvider.errorMessage == null) {
-          documentProvider.loadDocuments();
+        // Utiliser loadIfNeeded() qui vérifie le cache automatiquement
+        documentProvider.loadIfNeeded();
+      }
+    });
+    
+    // Écouter les événements de documents pour rafraîchir automatiquement
+    _eventSubscription = AppEventService.instance.events.listen((event) {
+      if (mounted) {
+        // Rafraîchir quand un document est uploadé, validé ou rejeté
+        if (event == AppEventType.documentUploaded ||
+            event == AppEventType.documentVerified ||
+            event == AppEventType.documentRejected) {
+          print('🔄 DocumentsScreen: Événement reçu - $event, rafraîchissement de la liste...');
+          final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+          // Invalider le cache et forcer le rechargement
+          documentProvider.invalidateCache();
+          documentProvider.refresh();
         }
       }
     });
@@ -38,6 +58,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   void dispose() {
+    _eventSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -66,9 +87,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.black),
         onPressed: () {
-          // Retourner au dashboard via le callback
-          if (widget.onBackToDashboard != null) {
-            widget.onBackToDashboard!();
+          // Retour en arrière
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            context.go('/dashboard');
           }
         },
       ),
@@ -87,8 +110,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const AddDocumentScreen(),
+                NavigationHelper.slideRoute(
+                  const AddDocumentScreen(),
                 ),
               );
             },
@@ -143,9 +166,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   }
 
   Widget _buildFilterTabs() {
-    return Consumer<DocumentProvider>(
-      builder: (context, documentProvider, child) {
-        final filters = ['Tous', ...documentProvider.documentTypes.where((f) => f != 'Tous')];
+    return Selector<DocumentProvider, List<String>>(
+      selector: (_, provider) => ['Tous', ...provider.documentTypes.where((f) => f != 'Tous')],
+      builder: (context, filters, child) {
+        final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
         
         return Container(
           height: 40,
@@ -157,7 +181,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               final filter = filters[index];
               final isSelected = documentProvider.selectedFilter == filter;
               
-              return Container(
+              return RepaintBoundary(
+                child: Container(
                 margin: const EdgeInsets.only(right: AppSpacing.spacing2),
                 child: FilterChip(
                   label: Text(
@@ -179,7 +204,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                   ),
                 ),
-              );
+              ),
+            );
             },
           ),
         );
@@ -188,9 +214,18 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   }
 
   Widget _buildDocumentsList() {
-    return Consumer<DocumentProvider>(
-      builder: (context, documentProvider, child) {
-        if (documentProvider.isLoading) {
+    return Selector<DocumentProvider, Map<String, dynamic>>(
+      selector: (_, provider) => {
+        'isLoading': provider.isLoading,
+        'errorMessage': provider.errorMessage,
+        'documentsCount': provider.documents.length,
+        'searchQuery': provider.searchQuery,
+        'selectedFilter': provider.selectedFilter,
+      },
+      builder: (context, state, child) {
+        final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+        
+        if (state['isLoading'] as bool) {
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(AppSpacing.spacing8),
@@ -199,21 +234,21 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           );
         }
 
-        if (documentProvider.errorMessage != null) {
+        if (state['errorMessage'] != null) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.spacing8),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.error_outline,
                     size: 48,
                     color: AppColors.error,
                   ),
                   const SizedBox(height: AppSpacing.spacing4),
                   Text(
-                    documentProvider.errorMessage!,
+                    state['errorMessage'] as String,
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.error,
                     ),
@@ -262,7 +297,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           itemCount: documentProvider.documents.length,
           itemBuilder: (context, index) {
             final document = documentProvider.documents[index];
-            return _buildDocumentCard(document);
+            return RepaintBoundary(
+              child: _buildDocumentCard(document),
+            );
           },
         );
       },
@@ -288,8 +325,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => DocumentDetailScreen(document: document),
+            NavigationHelper.slideRoute(
+              DocumentDetailScreen(document: document),
             ),
           );
         },

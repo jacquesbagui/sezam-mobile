@@ -17,12 +17,17 @@ class ApiResponse<T> {
   /// Indique si une vérification OTP est requise
   @JsonKey(name: 'requires_otp')
   final bool? requiresOtp;
+  
+  /// Code OTP pour les tests (uniquement en mode développement)
+  @JsonKey(name: 'otp_code')
+  final String? otpCode;
 
   ApiResponse({
     required this.message,
     this.data,
     this.token,
     this.requiresOtp,
+    this.otpCode,
   });
 
   factory ApiResponse.fromJson(

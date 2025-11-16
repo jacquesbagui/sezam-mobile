@@ -1,7 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../config/api_config.dart';
 import 'api_client.dart';
 import 'dart:io';
@@ -9,21 +9,42 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
 import '../services/consent_service.dart';
-import '../providers/document_provider.dart';
-import '../providers/consent_provider.dart';
-import '../providers/profile_provider.dart';
-import '../providers/auth_provider.dart';
 import '../../features/requests/request_detail_screen.dart';
 import 'app_event_service.dart';
 
 /// Service pour gérer les notifications push via Firebase Cloud Messaging
 class PushNotificationService {
+  // Singleton
+  static PushNotificationService? _instance;
+  static PushNotificationService get instance => _instance ??= PushNotificationService._();
+  
+  PushNotificationService._();
+
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final ApiClient _apiClient = ApiClient();
+  
+  // Plugin pour les notifications locales
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  
+  // Cache du token actuel
+  String? _currentToken;
+  
+  // Flag pour éviter les initialisations multiples
+  bool _isInitialized = false;
+  
+  // Timer pour gérer les tentatives de navigation différées
+  static const _navigationRetryDelay = Duration(seconds: 1);
+  static const _navigationMaxRetries = 3;
+  static const _navigationMediumDelay = Duration(milliseconds: 500);
 
   /// Initialiser Firebase Messaging et demander les permissions
   /// isAuthenticated permet de décider si on enregistre le device immédiatement
   Future<void> initialize({bool isAuthenticated = false}) async {
+    if (_isInitialized) {
+      print('⚠️ Push notification service déjà initialisé');
+      return;
+    }
+
     try {
       // Demander la permission
       NotificationSettings settings = await _firebaseMessaging.requestPermission(
@@ -33,17 +54,17 @@ class PushNotificationService {
         provisional: false,
       );
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('✅ Permission accordée');
-      } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
-        print('⚠️ Permission provisoire accordée');
-      } else {
-        print('❌ Permission refusée');
+      _logPermissionStatus(settings.authorizationStatus);
+
+      // Initialiser les notifications locales pour Android
+      if (Platform.isAndroid) {
+        await _initializeLocalNotifications();
       }
 
       // Obtenir le token FCM
       String? token = await _firebaseMessaging.getToken();
       if (token != null) {
+        _currentToken = token;
         print('📱 FCM Token obtenu: ${token.substring(0, 20)}...');
         
         // Enregistrer le device seulement si l'utilisateur est authentifié
@@ -53,9 +74,10 @@ class PushNotificationService {
       }
 
       // Écouter les nouveaux tokens
-      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
-        print('🔄 Token FCM rafraîchi');
-        // On n'enregistre pas automatiquement ici, il faudra appeler registerDevice manuellement
+      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+        print('🔄 Token FCM rafraîchi: ${newToken.substring(0, 20)}...');
+        _currentToken = newToken;
+        // Le token sera enregistré lors de la prochaine connexion
       });
 
       // Gérer les notifications en foreground
@@ -67,59 +89,74 @@ class PushNotificationService {
       // Vérifier si l'app a été ouverte depuis une notification
       RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null) {
-        _handleNotificationClick(initialMessage);
+        print('📱 App ouverte via notification: ${initialMessage.messageId}');
+        // Attendre que l'app soit complètement initialisée
+        Future.delayed(_navigationMediumDelay, () {
+          _handleNotificationClick(initialMessage);
+        });
       }
+
+      _isInitialized = true;
+      print('✅ Push notification service initialisé avec succès');
     } catch (e) {
       // Ignorer silencieusement les erreurs APNS sur le simulateur
-      if (e.toString().contains('APNS token has not been set')) {
+      if (e.toString().contains('APNS token has not been set') ||
+          e.toString().contains('MissingPluginException')) {
         print('⚠️ Push notifications indisponibles sur le simulateur (normal)');
       } else {
-        print('⚠️ Erreur lors de l\'initialisation de Firebase Messaging: $e');
+        print('❌ Erreur lors de l\'initialisation de Firebase Messaging: $e');
       }
+    }
+  }
+
+  /// Logger le statut de permission
+  void _logPermissionStatus(AuthorizationStatus status) {
+    switch (status) {
+      case AuthorizationStatus.authorized:
+        print('✅ Permission accordée');
+        break;
+      case AuthorizationStatus.provisional:
+        print('⚠️ Permission provisoire accordée');
+        break;
+      case AuthorizationStatus.denied:
+        print('❌ Permission refusée');
+        break;
+      case AuthorizationStatus.notDetermined:
+        print('⚠️ Permission non déterminée');
+        break;
     }
   }
 
   /// Enregistrer le token du device auprès du backend
   /// Retourne true si l'enregistrement a réussi
-  Future<bool> registerDeviceToken(String token) async {
+  Future<bool> registerDeviceToken([String? token]) async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      final packageInfo = await PackageInfo.fromPlatform();
+      // Utiliser le token fourni ou le token en cache
+      final deviceToken = token ?? _currentToken;
       
-      String deviceId;
-      String deviceType;
-      String deviceName;
-      String? osVersion;
-      String? deviceModel;
+      if (deviceToken == null) {
+        print('⚠️ Aucun token FCM disponible pour l\'enregistrement');
+        // Essayer de récupérer un nouveau token
+        final newToken = await _firebaseMessaging.getToken();
+        if (newToken == null) {
+          print('❌ Impossible d\'obtenir un token FCM');
+          return false;
+        }
+        _currentToken = newToken;
+        return registerDeviceToken(newToken);
+      }
 
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        deviceId = androidInfo.id;
-        deviceType = 'android';
-        deviceName = androidInfo.device;
-        osVersion = androidInfo.version.release;
-        deviceModel = androidInfo.model;
-      } else if (Platform.isIOS) {
-        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        deviceId = iosInfo.identifierForVendor ?? 'unknown';
-        deviceType = 'ios';
-        deviceName = iosInfo.name;
-        osVersion = iosInfo.systemVersion;
-        deviceModel = iosInfo.model;
-      } else {
-        throw UnsupportedError('Platform not supported');
+      final deviceInfo = await _getDeviceInfo();
+      if (deviceInfo == null) {
+        print('❌ Impossible de récupérer les informations du device');
+        return false;
       }
 
       await _apiClient.post(
         ApiConfig.devices,
         body: {
-          'device_id': deviceId,
-          'device_type': deviceType,
-          'device_name': deviceName,
-          'device_model': deviceModel,
-          'os_version': osVersion,
-          'app_version': packageInfo.version,
-          'push_token': token,
+          ...deviceInfo,
+          'push_token': deviceToken,
         },
       );
       
@@ -127,37 +164,206 @@ class PushNotificationService {
       print('✅ Device enregistré/mis à jour avec succès');
       return true;
     } catch (e) {
+      // Gérer spécifiquement l'erreur d'authentification
+      if (e.toString().contains('Unauthenticated') || 
+          e.toString().contains('401') ||
+          e.toString().contains('unauthenticated')) {
+        print('⚠️ Authentification requise pour enregistrer le device');
+        return false;
+      }
       print('❌ Erreur lors de l\'enregistrement du device: $e');
       return false;
+    }
+  }
+
+  /// Récupérer les informations du device
+  Future<Map<String, dynamic>?> _getDeviceInfo() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      final packageInfo = await PackageInfo.fromPlatform();
+
+      if (Platform.isAndroid) {
+        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        return {
+          'device_id': androidInfo.id,
+          'device_type': 'android',
+          'device_name': androidInfo.device,
+          'device_model': androidInfo.model,
+          'os_version': androidInfo.version.release,
+          'app_version': packageInfo.version,
+        };
+      } else if (Platform.isIOS) {
+        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        return {
+          'device_id': iosInfo.identifierForVendor ?? 'unknown',
+          'device_type': 'ios',
+          'device_name': iosInfo.name,
+          'device_model': iosInfo.model,
+          'os_version': iosInfo.systemVersion,
+          'app_version': packageInfo.version,
+        };
+      } else {
+        print('❌ Plateforme non supportée');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la récupération des infos device: $e');
+      return null;
     }
   }
   
   /// Récupérer le token FCM actuel (sans l'enregistrer)
   Future<String?> getToken() async {
     try {
-      return await _firebaseMessaging.getToken();
+      if (_currentToken != null) {
+        return _currentToken;
+      }
+      
+      final token = await _firebaseMessaging.getToken();
+      _currentToken = token;
+      return token;
     } catch (e) {
-      print('Erreur lors de la récupération du token: $e');
+      print('❌ Erreur lors de la récupération du token: $e');
       return null;
     }
   }
 
+  /// Initialiser les notifications locales pour Android
+  Future<void> _initializeLocalNotifications() async {
+    if (!Platform.isAndroid) return;
+
+    // Créer le canal de notification Android avec son
+    const androidChannel = AndroidNotificationChannel(
+      'sezam_channel',
+      'SEZAM Notifications',
+      description: 'Notifications importantes de SEZAM',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    // Créer le canal (nécessaire pour Android 8.0+)
+    final androidImplementation = _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    
+    if (androidImplementation != null) {
+      await androidImplementation.createNotificationChannel(androidChannel);
+      print('✅ Canal de notification Android créé');
+    }
+
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initializationSettings = InitializationSettings(
+      android: androidSettings,
+    );
+
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        // Gérer le clic sur la notification locale
+        if (response.payload != null) {
+          try {
+            final data = Map<String, dynamic>.from(
+              Uri.splitQueryString(response.payload!),
+            );
+            final type = data['type'];
+            if (type != null) {
+              _emitEventFromNotificationType(type);
+              _navigateFromNotification(
+                type: type,
+                screen: data['screen'],
+                consentId: data['consent_id'],
+              );
+            }
+          } catch (e) {
+            print('❌ Erreur lors du traitement du clic notification locale: $e');
+          }
+        }
+      },
+    );
+  }
+
   /// Gérer les notifications reçues quand l'app est au premier plan
   void _handleForegroundMessage(RemoteMessage message) {
-    print('Notification reçue en foreground: ${message.messageId}');
+    print('📬 Notification reçue en foreground: ${message.messageId}');
+    
+    try {
+      final data = message.data;
+      final type = data['type'];
+      final title = message.notification?.title ?? 'SEZAM';
+      final body = message.notification?.body ?? '';
+      
+      // Afficher une notification système Android avec son
+      if (Platform.isAndroid) {
+        _showLocalNotification(
+          title: title,
+          body: body,
+          data: data,
+        );
+      }
+      
+      if (type != null) {
+        print('📌 Type de notification: $type');
+        
+        // Toujours émettre l'événement, même sans contexte
+        // AppEventService gérera le retry automatiquement
+        _emitEventFromNotificationType(type);
+        
+        // Si le contexte est disponible, on peut aussi naviguer
+        final ctx = AppRouter.rootNavigatorKey.currentContext;
+        if (ctx != null && ctx.mounted) {
+          print('✅ Contexte disponible, navigation possible');
+        } else {
+          print('⚠️ Contexte non disponible, événement émis quand même (retry automatique)');
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ Erreur lors du traitement de la notification foreground: $e');
+      print('Stack trace: $stackTrace');
+    }
+  }
 
-    final data = message.data;
-    final type = data['type'];
-    final consentId = data['consent_id'] ?? data['consentId'];
+  /// Afficher une notification locale avec son
+  Future<void> _showLocalNotification({
+    required String title,
+    required String body,
+    required Map<String, dynamic> data,
+  }) async {
+    if (!Platform.isAndroid) return;
 
-    // Émettre un événement pour déclencher le rafraîchissement
-    _emitEventFromNotificationType(type);
+    try {
+      // Créer un payload pour le clic
+      final payload = Uri(queryParameters: {
+        'type': data['type'] ?? '',
+        'screen': data['screen'] ?? '',
+        'consent_id': data['consent_id'] ?? data['consentId'] ?? '',
+      }).query;
 
-    // Rafraîchir les ressources selon le type de notification (pour compatibilité)
-    _refreshResources(type);
+      const androidDetails = AndroidNotificationDetails(
+        'sezam_channel',
+        'SEZAM Notifications',
+        channelDescription: 'Notifications importantes de SEZAM',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+        // Utiliser le son par défaut du système
+      );
 
-    if (type == 'consent_request' && consentId != null) {
-      _navigateToConsent(consentId);
+      const notificationDetails = NotificationDetails(android: androidDetails);
+
+      await _localNotifications.show(
+        DateTime.now().millisecondsSinceEpoch.remainder(100000),
+        title,
+        body,
+        notificationDetails,
+        payload: payload,
+      );
+
+      print('✅ Notification locale affichée avec son');
+    } catch (e) {
+      print('❌ Erreur lors de l\'affichage de la notification locale: $e');
     }
   }
 
@@ -165,63 +371,85 @@ class PushNotificationService {
   void _handleNotificationClick(RemoteMessage message) {
     print('📱 Notification cliquée: ${message.messageId}');
     
-    // Extraire les données
-    final data = message.data;
-    final type = data['type'];
-    final consentId = data['consent_id'] ?? data['consentId'];
-    final screen = data['screen'];
-    
-    // Émettre un événement pour déclencher le rafraîchissement
-    _emitEventFromNotificationType(type);
-    
-    // Rafraîchir les ressources selon le type de notification (pour compatibilité)
-    _refreshResources(type);
-    
-    // Attendre un peu pour que l'app soit prête
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _navigateFromNotification(type, screen, consentId);
-    });
+    try {
+      // Extraire les données
+      final data = message.data;
+      final type = data['type'];
+      final consentId = data['consent_id'] ?? data['consentId'];
+      final screen = data['screen'];
+      
+      print('📊 Données notification - Type: $type, Screen: $screen, ConsentId: $consentId');
+      
+      // Émettre un événement pour déclencher le rafraîchissement
+      if (type != null) {
+        _emitEventFromNotificationType(type);
+      }
+      
+      // Attendre que l'app soit prête avant de naviguer
+      Future.delayed(_navigationMediumDelay, () {
+        _navigateFromNotification(
+          type: type,
+          screen: screen,
+          consentId: consentId,
+        );
+      });
+    } catch (e) {
+      print('❌ Erreur lors du traitement du clic notification: $e');
+    }
   }
 
-  /// Naviguer depuis une notification
-  void _navigateFromNotification(String? type, String? screen, String? consentId) {
+  /// Naviguer depuis une notification avec retry
+  void _navigateFromNotification({
+    String? type,
+    String? screen,
+    String? consentId,
+    int retryCount = 0,
+  }) {
     final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx == null) {
-      print('⚠️ Aucun contexte de navigation disponible, navigation différée');
-      // Réessayer après un délai
-      Future.delayed(const Duration(seconds: 1), () {
-        _navigateFromNotification(type, screen, consentId);
-      });
+    
+    if (ctx == null || !ctx.mounted) {
+      if (retryCount < _navigationMaxRetries) {
+        print('⚠️ Contexte non disponible, tentative ${retryCount + 1}/$_navigationMaxRetries');
+        Future.delayed(_navigationRetryDelay, () {
+          _navigateFromNotification(
+            type: type,
+            screen: screen,
+            consentId: consentId,
+            retryCount: retryCount + 1,
+          );
+        });
+      } else {
+        print('❌ Impossible de naviguer après $_navigationMaxRetries tentatives');
+      }
       return;
     }
 
     try {
-      // S'assurer d'être sur le dashboard d'abord
-      if (!ctx.canPop() || !ctx.mounted) {
-        // Si on n'est pas encore sur une route, aller au dashboard
-        ctx.go('/dashboard');
-        Future.delayed(const Duration(milliseconds: 300), () {
-          _performNavigation(ctx, type, screen, consentId);
-        });
-      } else {
-        _performNavigation(ctx, type, screen, consentId);
-      }
+      _performNavigation(ctx, type, screen, consentId);
     } catch (e) {
       print('❌ Erreur lors de la navigation: $e');
+      // Fallback: aller au dashboard
+      _safePush(ctx, '/dashboard');
     }
   }
 
   /// Effectuer la navigation selon le type de notification
-  void _performNavigation(BuildContext ctx, String? type, String? screen, String? consentId) {
+  void _performNavigation(
+    BuildContext ctx,
+    String? type,
+    String? screen,
+    String? consentId,
+  ) {
+    if (!ctx.mounted) {
+      print('⚠️ Widget non monté, navigation annulée');
+      return;
+    }
+
     try {
       // Priorité 1: Utiliser le screen fourni par le backend
       if (screen != null && screen.isNotEmpty) {
         print('📍 Navigation vers: $screen');
-        if (screen.startsWith('/')) {
-          ctx.go(screen);
-        } else {
-          ctx.push('/$screen');
-        }
+        _safePush(ctx, screen);
         return;
       }
 
@@ -229,7 +457,7 @@ class PushNotificationService {
       switch (type) {
         case 'profile_validated':
           print('📍 Navigation vers profil');
-          ctx.go('/profile');
+          _safePush(ctx, '/profile');
           break;
 
         case 'consent_request':
@@ -238,154 +466,107 @@ class PushNotificationService {
             _navigateToConsent(consentId);
           } else {
             print('📍 Navigation vers requests');
-            ctx.go('/dashboard');
-            // Attendre un peu puis naviguer vers requests
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (ctx.mounted) {
-                ctx.push('/requests');
-              }
-            });
+            _safePush(ctx, '/requests');
           }
           break;
 
         case 'consent_granted':
         case 'consent_denied':
           print('📍 Navigation vers requests');
-          ctx.go('/dashboard');
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (ctx.mounted) {
-              ctx.push('/requests');
-            }
-          });
+          _safePush(ctx, '/requests');
           break;
 
         case 'document_verified':
         case 'document_rejected':
           print('📍 Navigation vers documents');
-          ctx.go('/dashboard');
-          Future.delayed(const Duration(milliseconds: 500), () {
-            if (ctx.mounted) {
-              ctx.push('/documents');
-            }
-          });
+          _safePush(ctx, '/documents');
           break;
 
         default:
           // Par défaut, aller au dashboard
           print('📍 Navigation vers dashboard (par défaut)');
-          ctx.go('/dashboard');
+          _safePush(ctx, '/dashboard');
           break;
       }
     } catch (e) {
       print('❌ Erreur lors de la navigation: $e');
-      // Fallback: aller au dashboard
-      if (ctx.mounted) {
+      _safePush(ctx, '/dashboard');
+    }
+  }
+
+  /// Navigation sécurisée avec gestion des erreurs
+  void _safePush(BuildContext ctx, String route) {
+    if (!ctx.mounted) {
+      print('⚠️ Widget non monté, impossible de naviguer');
+      return;
+    }
+
+    try {
+      if (route.startsWith('/')) {
+        ctx.go(route);
+      } else {
+        ctx.push('/$route');
+      }
+    } catch (e) {
+      print('❌ Erreur lors de la navigation vers $route: $e');
+      // Dernier fallback
+      try {
         ctx.go('/dashboard');
+      } catch (e2) {
+        print('❌ Impossible de naviguer vers le dashboard: $e2');
       }
     }
   }
 
   /// Convertir le type de notification en événement
-  void _emitEventFromNotificationType(String? type) {
-    if (type == null) return;
+  void _emitEventFromNotificationType(String type) {
+    final eventMap = {
+      'profile_validated': AppEventType.profileValidated,
+      'consent_request': AppEventType.consentRequested,
+      'consent_granted': AppEventType.consentGranted,
+      'consent_denied': AppEventType.consentDenied,
+      'document_verified': AppEventType.documentVerified,
+      'document_rejected': AppEventType.documentRejected,
+      'document_uploaded': AppEventType.documentUploaded,
+      'user_code_generated': AppEventType.userCodeGenerated,
+      'kyc_completed': AppEventType.kycCompleted,
+    };
 
-    switch (type) {
-      case 'profile_validated':
-        AppEventService.instance.emit(AppEventType.profileValidated);
-        break;
-      case 'consent_request':
-        AppEventService.instance.emit(AppEventType.consentRequested);
-        break;
-      case 'consent_granted':
-        AppEventService.instance.emit(AppEventType.consentGranted);
-        break;
-      case 'consent_denied':
-        AppEventService.instance.emit(AppEventType.consentDenied);
-        break;
-      case 'document_verified':
-        AppEventService.instance.emit(AppEventType.documentVerified);
-        break;
-      default:
-        // Pour les autres types, ne rien faire ou émettre un événement générique
-        break;
+    final eventType = eventMap[type];
+    if (eventType != null) {
+      print('📢 Émission de l\'événement: $eventType');
+      AppEventService.instance.emit(eventType);
+    } else {
+      print('⚠️ Type de notification non reconnu: $type');
     }
   }
 
-  /// Rafraîchir les ressources selon le type de notification
-  void _refreshResources(String? type) {
-    final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx == null) {
-      print('⚠️ Aucun contexte disponible pour rafraîchir les ressources');
-      return;
-    }
-
-    try {
-      switch (type) {
-        case 'document_verified':
-        case 'document_rejected':
-          // Rafraîchir les documents et le profil
-          print('🔄 Rafraîchissement des documents et du profil...');
-          final documentProvider = Provider.of<DocumentProvider>(ctx, listen: false);
-          documentProvider.loadDocuments();
-          
-          final profileProvider = Provider.of<ProfileProvider>(ctx, listen: false);
-          profileProvider.loadProfileStatus();
-          
-          // Rafraîchir aussi l'utilisateur car son statut peut avoir changé
-          final authProvider = Provider.of<AuthProvider>(ctx, listen: false);
-          authProvider.refreshUser();
-          break;
-
-        case 'consent_request':
-        case 'consent_granted':
-        case 'consent_denied':
-        case 'consent_revoked':
-          // Rafraîchir les consentements/requests
-          print('🔄 Rafraîchissement des consentements/requests...');
-          final consentProvider = Provider.of<ConsentProvider>(ctx, listen: false);
-          consentProvider.loadConsents();
-          break;
-
-        default:
-          // Pour les autres types, rafraîchir toutes les ressources importantes
-          print('🔄 Rafraîchissement général des ressources...');
-          final documentProvider = Provider.of<DocumentProvider>(ctx, listen: false);
-          documentProvider.loadDocuments();
-          
-          final consentProvider = Provider.of<ConsentProvider>(ctx, listen: false);
-          consentProvider.loadConsents();
-          
-          final profileProvider = Provider.of<ProfileProvider>(ctx, listen: false);
-          profileProvider.loadProfileStatus();
-          
-          final authProvider = Provider.of<AuthProvider>(ctx, listen: false);
-          authProvider.refreshUser();
-          break;
-      }
-      print('✅ Ressources rafraîchies avec succès');
-    } catch (e) {
-      print('❌ Erreur lors du rafraîchissement des ressources: $e');
-    }
-  }
-
+  /// Naviguer vers le détail d'un consentement
   Future<void> _navigateToConsent(String consentId) async {
     final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx == null) {
+    if (ctx == null || !ctx.mounted) {
       print('⚠️ Aucun contexte de navigation disponible');
       return;
     }
 
     try {
+      print('🔍 Chargement du consentement: $consentId');
+      
       // Charger le consentement depuis l'API
       final consent = await ConsentService().getConsentById(consentId);
+      
       if (consent == null) {
-        // À défaut, ouvrir la liste des demandes
-        ctx.push('/requests');
+        print('⚠️ Consentement introuvable, redirection vers /requests');
+        _safePush(ctx, '/requests');
         return;
       }
 
-      // S'assurer d'être sur l'écran des demandes, puis ouvrir le détail
-      await ctx.push('/requests');
+      if (!ctx.mounted) {
+        print('⚠️ Widget non monté après chargement');
+        return;
+      }
+
+      // Naviguer vers le détail du consentement
       await Navigator.of(ctx).push(
         MaterialPageRoute(
           builder: (_) => RequestDetailScreen(
@@ -395,32 +576,42 @@ class PushNotificationService {
         ),
       );
     } catch (e) {
-      print('Erreur de navigation vers le consentement: $e');
+      print('❌ Erreur de navigation vers le consentement: $e');
       // Fallback: ouvrir la liste des demandes
-      ctx.push('/requests');
+      if (ctx.mounted) {
+        _safePush(ctx, '/requests');
+      }
     }
   }
 
   /// Abonner l'utilisateur à un topic
-  Future<void> subscribeToTopic(String topic) async {
+  Future<bool> subscribeToTopic(String topic) async {
     try {
       await _firebaseMessaging.subscribeToTopic(topic);
-      print('Abonné au topic: $topic');
+      print('✅ Abonné au topic: $topic');
+      return true;
     } catch (e) {
-      print('Erreur lors de l\'abonnement au topic: $e');
+      print('❌ Erreur lors de l\'abonnement au topic $topic: $e');
+      return false;
     }
   }
 
   /// Désabonner l'utilisateur d'un topic
-  Future<void> unsubscribeFromTopic(String topic) async {
+  Future<bool> unsubscribeFromTopic(String topic) async {
     try {
       await _firebaseMessaging.unsubscribeFromTopic(topic);
-      print('Désabonné du topic: $topic');
+      print('✅ Désabonné du topic: $topic');
+      return true;
     } catch (e) {
-      print('Erreur lors du désabonnement du topic: $e');
+      print('❌ Erreur lors du désabonnement du topic $topic: $e');
+      return false;
     }
   }
+
+  /// Réinitialiser le service (utile pour les tests ou déconnexion)
+  void reset() {
+    _currentToken = null;
+    _isInitialized = false;
+    _instance = null;
+  }
 }
-
-// Note: Le handler pour les notifications en background est défini dans main.dart
-

@@ -142,5 +142,71 @@ class ProfileService {
       rethrow;
     }
   }
+
+  /// Mettre à jour le motif d'utilisation
+  Future<void> updateUsagePurpose(String usagePurpose) async {
+    try {
+      await _apiClient.put(
+        ApiConfig.updateProfile,
+        body: {
+          'metadata': {
+            'usage_purpose': usagePurpose,
+          },
+        },
+      );
+    } catch (e) {
+      print('Erreur updateUsagePurpose: $e');
+      if (e is ApiException) {
+        throw AuthenticationException(e.message);
+      }
+      rethrow;
+    }
+  }
+
+  /// Accepter les conditions d'utilisation
+  Future<void> acceptTerms() async {
+    try {
+      await _apiClient.put(
+        ApiConfig.updateProfile,
+        body: {
+          'metadata': {
+            'terms_accepted': true,
+            'terms_accepted_at': DateTime.now().toIso8601String(),
+          },
+        },
+      );
+    } catch (e) {
+      print('Erreur acceptTerms: $e');
+      if (e is ApiException) {
+        throw AuthenticationException(e.message);
+      }
+      rethrow;
+    }
+  }
+
+  /// Vérifier si l'utilisateur a déjà rempli usage_purpose et terms_accepted
+  Future<bool> hasCompletedOnboarding() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiConfig.userProfile,
+        fromJson: (json) => json,
+      );
+      
+      if (response.data == null) return false;
+      
+      final user = response.data!;
+      final metadata = user['metadata'] as Map<String, dynamic>?;
+      
+      if (metadata == null) return false;
+      
+      final hasUsagePurpose = metadata['usage_purpose'] != null;
+      final hasTermsAccepted = metadata['terms_accepted'] == true;
+      
+      return hasUsagePurpose && hasTermsAccepted;
+    } catch (e) {
+      print('Erreur hasCompletedOnboarding: $e');
+      return false;
+    }
+  }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
@@ -29,11 +30,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
     
-    // Charger le statut du profil et rafraîchir l'utilisateur
+    // Charger le statut du profil et rafraîchir l'utilisateur (utiliser cache si disponible)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      profileProvider.loadProfileStatus();
+      profileProvider.loadIfNeeded(); // Utiliser cache si disponible
       // Rafraîchir l'utilisateur pour avoir les données à jour (notamment verified_at)
       authProvider.refreshUser().catchError((e) => print('Erreur refreshUser: $e'));
     });
@@ -242,19 +243,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     if (user?.profileImage != null && user!.profileImage!.isNotEmpty) {
       return ClipOval(
-        child: Image.network(
-          user.profileImage!,
+        child: CachedNetworkImage(
+          imageUrl: user.profileImage!,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: AppColors.primary,
-              child: const Icon(
-                Icons.person,
-                color: Colors.white,
-                size: 40,
-              ),
-            );
-          },
+          placeholder: (context, url) => Container(
+            color: AppColors.primary.withValues(alpha: 0.2),
+            child: const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: AppColors.primary,
+            child: const Icon(
+              Icons.person,
+              color: Colors.white,
+              size: 40,
+            ),
+          ),
         ),
       );
     }
@@ -365,13 +372,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileProgressSection() {
-    return Consumer<ProfileProvider>(
-      builder: (context, profileProvider, child) {
-        if (profileProvider.isLoading) {
+    return Selector<ProfileProvider, Map<String, dynamic>>(
+      selector: (_, provider) => {
+        'isLoading': provider.isLoading,
+        'profileStatus': provider.profileStatus,
+      },
+      builder: (context, state, child) {
+        final isLoading = state['isLoading'] as bool;
+        final profileStatus = state['profileStatus'] as dynamic;
+        
+        if (isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final profileStatus = profileProvider.profileStatus;
         if (profileStatus == null) {
           return const SizedBox.shrink();
         }
@@ -438,26 +451,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMissingFieldsSection() {
-    return Consumer<ProfileProvider>(
-      builder: (context, profileProvider, child) {
+    return Selector<ProfileProvider, Map<String, dynamic>>(
+      selector: (_, provider) => {
+        'isLoading': provider.isLoading,
+        'missingFieldsDisplay': provider.missingFieldsDisplay,
+        'missingFields': provider.missingFields,
+        'isComplete': provider.isComplete,
+        'profileStatus': provider.profileStatus,
+      },
+      builder: (context, state, child) {
         // Utiliser les noms d'affichage en français
-        final missingFields = profileProvider.missingFieldsDisplay;
-        final missingFieldsRaw = profileProvider.missingFields;
-        final isComplete = profileProvider.isComplete;
+        final missingFields = state['missingFieldsDisplay'] as List<String>;
+        final missingFieldsRaw = state['missingFields'] as List<String>;
+        final isComplete = state['isComplete'] as bool;
+        final isLoading = state['isLoading'] as bool;
+        final profileStatus = state['profileStatus'] as dynamic;
         
         // Debug logs
         print('🔍 _buildMissingFieldsSection:');
-        print('   - isLoading: ${profileProvider.isLoading}');
+        print('   - isLoading: $isLoading');
         print('   - isComplete: $isComplete');
         print('   - missingFields (raw): $missingFieldsRaw');
         print('   - missingFields (display): $missingFields');
-        print('   - profileStatus: ${profileProvider.profileStatus != null}');
-        if (profileProvider.profileStatus != null) {
-          print('   - completionPercentage: ${profileProvider.profileStatus!.completionPercentage}%');
+        print('   - profileStatus: ${profileStatus != null}');
+        if (profileStatus != null) {
+          print('   - completionPercentage: ${profileStatus.completionPercentage}%');
         }
         
         // Si le profil est en cours de chargement, afficher un indicateur
-        if (profileProvider.isLoading) {
+        if (isLoading) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
             child: Container(

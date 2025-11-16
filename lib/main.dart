@@ -14,6 +14,7 @@ import 'core/providers/notification_provider.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/app_event_service.dart';
 import 'core/widgets/app_lifecycle_listener.dart' show SezamAppLifecycleListener;
+import 'core/widgets/global_notification_listener.dart';
 
 // Handler pour les notifications en background
 @pragma('vm:entry-point')
@@ -42,6 +43,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       case 'document_verified':
         AppEventService.instance.emit(AppEventType.documentVerified);
         break;
+      case 'document_rejected':
+        AppEventService.instance.emit(AppEventType.documentRejected);
+        break;
     }
   }
 }
@@ -59,7 +63,7 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     
     // Initialiser le service de notifications push (sans enregistrer le device)
-    final pushNotificationService = PushNotificationService();
+    final pushNotificationService = PushNotificationService.instance;
     await pushNotificationService.initialize(isAuthenticated: false);
   } catch (e) {
     print('⚠️ Erreur lors de l\'initialisation de Firebase: $e');
@@ -88,29 +92,31 @@ class SezamApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: SezamAppLifecycleListener(
-        child: MaterialApp.router(
-          title: 'SEZAM - Identité Numérique',
-          debugShowCheckedModeBanner: false,
-          
-          // Thèmes
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: ThemeMode.system,
-          
-          // Router
-          routerConfig: AppRouter.router,
-          
-          // Localisation
-          locale: const Locale('fr', 'FR'),
-          supportedLocales: const [
-            Locale('fr', 'FR'),
-            Locale('en', 'US'),
-          ],
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+        child: GlobalNotificationListener(
+          child: MaterialApp.router(
+            title: 'SEZAM - Identité Numérique',
+            debugShowCheckedModeBanner: false,
+            
+            // Thèmes
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode.system,
+            
+            // Router
+            routerConfig: AppRouter.router,
+            
+            // Localisation
+            locale: const Locale('fr', 'FR'),
+            supportedLocales: const [
+              Locale('fr', 'FR'),
+              Locale('en', 'US'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+          ),
         ),
       ),
     );

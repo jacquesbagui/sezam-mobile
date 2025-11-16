@@ -59,12 +59,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
         elevation: 0,
       ),
-      body: Consumer<NotificationProvider>(
-        builder: (context, notificationProvider, child) {
-          if (notificationProvider.isLoading) {
+      body: Selector<NotificationProvider, bool>(
+        selector: (_, provider) => provider.isLoading,
+        builder: (context, isLoading, child) {
+          if (isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
 
+          final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
           return Column(
             children: [
               Padding(

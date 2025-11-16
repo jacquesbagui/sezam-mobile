@@ -4,11 +4,15 @@ import 'package:provider/provider.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/auth/auth_screen.dart';
+import '../../features/auth/success_screen.dart';
+import '../../features/auth/otp_verification_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/profile/profile_screen.dart';
-import '../../features/profile/personal_info_kyc_screen.dart';
 import '../../features/kyc/kyc_screen.dart';
 import '../../features/requests/requests_screen.dart' as requests_feature;
+import '../../features/documents/documents_screen.dart' as documents_feature;
+import '../../features/auth/usage_purpose_screen.dart';
+import '../../features/auth/terms_consent_screen.dart';
 import '../../core/providers/auth_provider.dart';
 
 /// Configuration des routes de l'application SEZAM
@@ -40,6 +44,34 @@ class AppRouter {
         builder: (context, state) => const AuthScreen(),
       ),
       
+      // OTP Verification - Protected route (for registration)
+      GoRoute(
+        path: '/otp-verification',
+        name: 'otp-verification',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'];
+          final otpCode = state.uri.queryParameters['otp_code']; // Pour les tests
+          return OtpVerificationScreen(
+            email: email,
+            otpCode: otpCode,
+          );
+        },
+      ),
+      
+      // Registration Success - Protected route
+      GoRoute(
+        path: '/registration-success',
+        name: 'registration-success',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const RegistrationSuccessScreen(),
+      ),
+      
       // Dashboard (avec navigation bottom) - Protected route
       GoRoute(
         path: '/dashboard',
@@ -54,11 +86,18 @@ class AppRouter {
         builder: (context, state) => const DashboardScreen(),
       ),
       
-      // Documents
+      // Documents - Protected route
       GoRoute(
         path: '/documents',
         name: 'documents',
-        builder: (context, state) => const DocumentsScreen(),
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const documents_feature.DocumentsScreen(),
       ),
       
       // Requests (use real feature screen)
@@ -96,10 +135,10 @@ class AppRouter {
         builder: (context, state) => const KycScreen(),
       ),
       
-      // Personal Info KYC - Protected route
+      // Usage Purpose - Protected route
       GoRoute(
-        path: '/personal-info-kyc',
-        name: 'personal-info-kyc',
+        path: '/usage-purpose',
+        name: 'usage-purpose',
         redirect: (context, state) {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
@@ -107,28 +146,28 @@ class AppRouter {
           }
           return null;
         },
-        builder: (context, state) => const PersonalInfoKycScreen(),
+        builder: (context, state) => const UsagePurposeScreen(),
+      ),
+      
+      // Terms Consent - Protected route
+      GoRoute(
+        path: '/terms-consent',
+        name: 'terms-consent',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const TermsConsentScreen(),
       ),
     ],
     errorBuilder: (context, state) => const ErrorScreen(),
   );
 }
 
-/// Écrans temporaires pour les routes non encore implémentées
-class DocumentsScreen extends StatelessWidget {
-  const DocumentsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Documents')),
-      body: const Center(
-        child: Text('Écran Documents - À implémenter'),
-      ),
-    );
-  }
-}
-
+// Removed placeholder DocumentsScreen; using real implementation from features/documents/documents_screen.dart
 // Removed placeholder RequestsScreen; using real implementation from features/requests/requests_screen.dart
 
 // ProfileScreen is imported from features/profile/profile_screen.dart

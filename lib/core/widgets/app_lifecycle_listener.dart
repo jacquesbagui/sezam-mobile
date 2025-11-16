@@ -65,14 +65,14 @@ class _SezamAppLifecycleListenerState extends State<SezamAppLifecycleListener>
 
       print('🔄 App revenue au premier plan - rafraîchissement des données...');
 
-      // Rafraîchir les données en parallèle
+      // Rafraîchir les données en parallèle (utiliser loadIfNeeded pour éviter rechargement inutile)
       await Future.wait([
         authProvider.refreshUser().catchError((e) => print('Erreur refreshUser: $e')),
         Provider.of<ConsentProvider>(context, listen: false)
-            .loadConsents()
+            .loadIfNeeded()
             .catchError((e) => print('Erreur loadConsents: $e')),
         Provider.of<ProfileProvider>(context, listen: false)
-            .loadProfileStatus()
+            .loadIfNeeded()
             .catchError((e) => print('Erreur loadProfileStatus: $e')),
       ], eagerError: false);
 

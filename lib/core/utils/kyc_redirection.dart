@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/profile_provider.dart';
 import '../services/token_storage_service.dart';
+import '../services/profile_service.dart';
 
 /// Utility pour gérer la redirection après connexion en fonction du statut KYC
 class KycRedirection {
@@ -30,11 +31,21 @@ class KycRedirection {
     
     if (!context.mounted) return;
     
-    // Si le KYC est complet (is_complete = true), aller au dashboard
-    // Peu importe si le profil est validé par l'admin ou non
+    // Si le KYC est complet (is_complete = true), vérifier les étapes suivantes
     if (profileProvider.isComplete) {
-      // KYC complet → Dashboard
-      context.go('/dashboard');
+      // Vérifier si l'utilisateur a complété usage_purpose et terms_accepted
+      final profileService = ProfileService();
+      final hasCompletedOnboarding = await profileService.hasCompletedOnboarding();
+      
+      if (!context.mounted) return;
+      
+      if (!hasCompletedOnboarding) {
+        // KYC complet mais onboarding non complété → Usage Purpose
+        context.go('/usage-purpose');
+      } else {
+        // Tout est complété → Dashboard
+        context.go('/dashboard');
+      }
     } else {
       // KYC incomplet → KYC
       context.go('/kyc');

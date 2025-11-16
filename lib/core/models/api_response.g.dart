@@ -14,6 +14,7 @@ ApiResponse<T> _$ApiResponseFromJson<T>(
   data: _$nullableGenericFromJson(json['data'], fromJsonT),
   token: json['token'] as String?,
   requiresOtp: json['requires_otp'] as bool?,
+  otpCode: json['otp_code'] as String?,
 );
 
 Map<String, dynamic> _$ApiResponseToJson<T>(
@@ -24,6 +25,7 @@ Map<String, dynamic> _$ApiResponseToJson<T>(
   'data': _$nullableGenericToJson(instance.data, toJsonT),
   'token': instance.token,
   'requires_otp': instance.requiresOtp,
+  'otp_code': instance.otpCode,
 };
 
 T? _$nullableGenericFromJson<T>(

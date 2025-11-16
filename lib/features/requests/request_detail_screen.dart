@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -30,6 +31,9 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   Set<String> _selectedScopeIds = {};
   Set<String> _scopesWithMissingFields = {};
   late ConsentModel _currentConsent;
+  bool _hasInitialized = false;
+  bool _isRefreshing = false;
+  StreamSubscription<AppEventType>? _eventSubscription;
 
   @override
   void initState() {
@@ -43,24 +47,81 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     }).toSet() ?? {};
     
     // Identifier les scopes avec champs manquants
-    _scopesWithMissingFields = widget.consent.scopes
-        ?.where((s) => s.hasMissingFields)
+    _updateMissingFields();
+    
+    // Écouter les événements de validation de documents et de mise à jour de profil
+    _eventSubscription = AppEventService.instance.events.listen((event) {
+      if (mounted && !_isRefreshing) {
+        // Rafraîchir quand un document est validé, uploadé, ou quand le profil est mis à jour
+        if (event == AppEventType.documentVerified ||
+            event == AppEventType.documentUploaded ||
+            event == AppEventType.profileUpdated) {
+          print('🔄 RequestDetailScreen: Événement reçu - $event, rafraîchissement des données...');
+          _refreshConsentAfterUpdate();
+        }
+      }
+    });
+  }
+  
+  @override
+  void dispose() {
+    _eventSubscription?.cancel();
+    super.dispose();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ne rafraîchir qu'une seule fois au premier didChangeDependencies
+    // pour éviter les boucles infinies
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      // Recharger les données quand l'écran devient visible (après retour de KYC par exemple)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_isRefreshing) {
+          _refreshConsentAfterUpdate();
+        }
+      });
+    }
+  }
+  
+  /// Mettre à jour la liste des scopes avec champs manquants
+  void _updateMissingFields() {
+    _scopesWithMissingFields = _currentConsent.scopes
+        ?.where((s) {
+          // Vérifier à la fois hasMissingFields ET que missingFields n'est pas vide
+          final hasMissing = s.hasMissingFields && 
+                            s.missingFields != null && 
+                            s.missingFields!.isNotEmpty;
+          if (hasMissing) {
+            print('🔍 Scope "${s.displayName}" a des champs manquants: ${s.missingFields}');
+          }
+          return hasMissing;
+        })
         .map((s) => s.id)
         .toSet() ?? {};
+    
+    print('📊 Total scopes avec champs manquants: ${_scopesWithMissingFields.length}');
   }
   
   /// Vérifier si on peut accepter la demande
   bool get _canGrantConsent {
     // Si aucun scope sélectionné
-    if (_selectedScopeIds.isEmpty) return false;
+    if (_selectedScopeIds.isEmpty) {
+      print('🚫 Pas de scope sélectionné');
+      return false;
+    }
     
     // Si des scopes sélectionnés ont des champs manquants
     for (var scopeId in _selectedScopeIds) {
       if (_scopesWithMissingFields.contains(scopeId)) {
+        final scope = _currentConsent.scopes?.firstWhere((s) => s.id == scopeId);
+        print('🚫 Scope "${scope?.displayName}" a des champs manquants: ${scope?.missingFields?.join(', ') ?? 'N/A'}');
         return false;
       }
     }
     
+    print('✅ Tous les scopes sélectionnés sont complets');
     return true;
   }
 
@@ -602,16 +663,27 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
           const SizedBox(width: AppSpacing.spacing4),
           Expanded(
             child: ElevatedButton(
-              onPressed: _canGrantConsent ? _handleGrant : null,
+              onPressed: _canGrantConsent && !_isProcessing ? _handleGrant : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _canGrantConsent ? AppColors.success : AppColors.gray400,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.gray400,
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.6),
                 padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacing4),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                 ),
               ),
-              child: const Text('Accepter'),
+              child: _isProcessing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Accepter'),
             ),
           ),
         ],
@@ -776,6 +848,42 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   Map<String, dynamic>? _getFieldMapping(String fieldName) {
     // Mapping des noms d'affichage vers les fieldKeys et types
     // Ces noms correspondent à ceux retournés par ScopeResource::getFieldDisplayName
+    
+    // Vérifier si c'est un document manquant
+    final documentMappings = {
+      'Justificatif de domicile': {
+        'type': 'document',
+        'documentType': 'proof_of_address',
+        'label': 'Justificatif de domicile',
+      },
+      'Pièce d\'identité': {
+        'type': 'document',
+        'documentType': 'id_card',
+        'label': 'Pièce d\'identité',
+      },
+      'Passeport': {
+        'type': 'document',
+        'documentType': 'passport',
+        'label': 'Passeport',
+      },
+      'Permis de conduire': {
+        'type': 'document',
+        'documentType': 'drivers_license',
+        'label': 'Permis de conduire',
+      },
+      'Bulletin de salaire': {
+        'type': 'document',
+        'documentType': 'salary_slip',
+        'label': 'Bulletin de salaire',
+      },
+    };
+    
+    // Si c'est un document, retourner le mapping document
+    if (documentMappings.containsKey(fieldName)) {
+      return documentMappings[fieldName];
+    }
+    
+    // Mapping exact des noms retournés par ScopeResource::getFieldDisplayName
     final mappings = {
       'Email': {
         'fieldKey': 'email',
@@ -859,6 +967,30 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
 
   /// Éditer un champ manquant
   Future<void> _editMissingField(Map<String, dynamic> fieldMapping) async {
+    // Si c'est un document manquant, rediriger vers la page d'upload de documents
+    if (fieldMapping['type'] == 'document') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Veuillez ajouter votre ${fieldMapping['label']} dans la section Documents'),
+            backgroundColor: AppColors.warning,
+            action: SnackBarAction(
+              label: 'Ajouter',
+              textColor: Colors.white,
+              onPressed: () {
+                // Fermer la demande et naviguer vers la page des documents
+                Navigator.pop(context);
+                // Utiliser push pour garder la route précédente dans la pile
+                context.push('/documents');
+              },
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+    
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
     
@@ -895,36 +1027,91 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
 
   /// Rafraîchir le consent après mise à jour du profil
   Future<void> _refreshConsentAfterUpdate() async {
-    if (!mounted) return;
+    if (!mounted || _isRefreshing) return;
     
-    print('🔄 Rechargement des données après mise à jour du profil...');
-    
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.refreshUser();
-    print('✅ Utilisateur rechargé');
-    
-    final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
-    await consentProvider.loadConsents();
-    print('✅ Consents rechargés: ${consentProvider.consents.length}');
-    
-    // Récupérer le consent mis à jour
-    final updatedConsent = consentProvider.consents.firstWhere(
-      (c) => c.id == widget.consent.id,
-      orElse: () => widget.consent,
-    );
-    
-    // Mettre à jour le consent actuel et les scopes avec champs manquants
-    if (mounted) {
-      setState(() {
-        _currentConsent = updatedConsent;
-        _scopesWithMissingFields = updatedConsent.scopes
-            ?.where((s) => s.hasMissingFields)
-            .map((s) => s.id)
-            .toSet() ?? {};
-      });
+    _isRefreshing = true;
+    try {
+      print('🔄 Rechargement des données après mise à jour du profil...');
       
-      print('📊 Scopes avec champs manquants: ${_scopesWithMissingFields.length}');
-      print('✅ Mise à jour terminée');
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshUser();
+      print('✅ Utilisateur rechargé');
+      
+      // Afficher les informations de l'utilisateur
+      final user = authProvider.currentUser;
+      if (user != null) {
+        print('👤 Informations utilisateur:');
+        print('   - Email: ${user.email}');
+        print('   - Téléphone: ${user.phone}');
+        print('   - Prénom: ${user.firstName}');
+        print('   - Nom: ${user.lastName}');
+        print('   - Nom complet: ${user.fullName}');
+        
+        if (user.profile != null) {
+          final profile = user.profile!;
+          print('   📋 Profil:');
+          print('      - Date de naissance: ${profile['birth_date'] ?? "N/A"}');
+          print('      - Genre: ${profile['gender_id'] ?? "N/A"}');
+          print('      - Adresse: ${profile['address_line1'] ?? "N/A"}');
+          print('      - Ville: ${profile['city'] ?? "N/A"}');
+          print('      - Pays: ${profile['country_id'] ?? "N/A"}');
+          print('      - Nationalité: ${profile['nationality_id'] ?? "N/A"}');
+          print('      - Profession: ${profile['occupation'] ?? "N/A"}');
+        }
+      }
+      
+      final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
+      await consentProvider.loadConsents(force: true);
+      print('✅ Consents rechargés: ${consentProvider.consents.length}');
+      
+      // Récupérer le consent mis à jour
+      final updatedConsent = consentProvider.consents.firstWhere(
+        (c) => c.id == widget.consent.id,
+        orElse: () => widget.consent,
+      );
+      
+      // Afficher les champs demandés par chaque scope
+      print('📋 Champs demandés par chaque scope:');
+      for (var scope in updatedConsent.scopes ?? []) {
+        print('   🔹 ${scope.displayName} (${scope.id}):');
+        print('      - hasMissingFields: ${scope.hasMissingFields}');
+        print('      - missingFields: ${scope.missingFields}');
+        print('      - fieldsIncluded: ${scope.fieldsIncluded}');
+        if (scope.fieldsIncluded != null && scope.fieldsIncluded!.isNotEmpty) {
+          print('      - Champs demandés:');
+          for (var field in scope.fieldsIncluded!) {
+            print('         • $field');
+          }
+        }
+      }
+      
+      // Mettre à jour le consent actuel et les scopes avec champs manquants
+      if (mounted) {
+        setState(() {
+          _currentConsent = updatedConsent;
+          _updateMissingFields();
+        });
+        
+        print('📊 Scopes avec champs manquants: ${_scopesWithMissingFields.length}');
+        print('📋 Détails des scopes avec champs manquants:');
+        for (var scope in updatedConsent.scopes ?? []) {
+          if (scope.hasMissingFields) {
+            print('   - ${scope.displayName}:');
+            print('     hasMissingFields: ${scope.hasMissingFields}');
+            print('     missingFields: ${scope.missingFields}');
+            print('     missingFields count: ${scope.missingFields?.length ?? 0}');
+            if (scope.missingFields != null && scope.missingFields!.isNotEmpty) {
+              for (var field in scope.missingFields!) {
+                final mapping = _getFieldMapping(field);
+                print('       - "$field" -> mapping: ${mapping != null ? "OK" : "NULL"}');
+              }
+            }
+          }
+        }
+        print('✅ Mise à jour terminée');
+      }
+    } finally {
+      _isRefreshing = false;
     }
   }
   
@@ -1005,12 +1192,38 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        // Extraire le message d'erreur proprement
+        String errorMessage = e.toString();
+        if (errorMessage.contains('Exception: ')) {
+          errorMessage = errorMessage.replaceAll('Exception: ', '');
+        }
+        // Si le message contient "Documents manquants", c'est une erreur spécifique
+        if (errorMessage.contains('Documents manquants')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Ajouter',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Utiliser push pour garder la route précédente dans la pile
+                  context.push('/documents');
+                },
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -1022,9 +1235,19 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
   Future<String?> _showOtpDialog(String email) async {
     // Demander l'OTP d'abord
     final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
+    String? testCode;
     try {
-      await consentProvider.requestConsentOtp(widget.consent.id);
+      // Récupérer le code OTP en mode test (si disponible)
+      print('🔑 Demande du code OTP pour affichage en mode test...');
+      testCode = await consentProvider.requestConsentOtp(widget.consent.id);
+      print('🔑 Code OTP récupéré: ${testCode ?? "null"}');
+      if (testCode != null) {
+        print('✅ Code OTP disponible, sera affiché dans le dialogue');
+      } else {
+        print('⚠️ Aucun code OTP en mode test disponible');
+      }
     } catch (e) {
+      print('❌ Erreur lors de la récupération de l\'OTP: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1040,36 +1263,50 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
     return await showDialog<String>(
       context: context,
       barrierDismissible: true, // Permettre de fermer en cliquant en dehors
-      builder: (context) => PopScope(
-        canPop: true,
-        child: OtpVerificationDialog(
-          email: email,
-          onResend: () async {
-            try {
-              await consentProvider.requestConsentOtp(widget.consent.id);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Code renvoyé avec succès'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur: ${e.toString()}'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              }
-            }
-          },
-          onSubmit: (code) {
-            Navigator.of(context).pop(code);
-          },
-        ),
+      useSafeArea: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          String? currentTestCode = testCode;
+          
+          return PopScope(
+            canPop: true,
+            child: OtpVerificationDialog(
+              email: email,
+              testCode: currentTestCode, // Passer le code OTP en mode test
+              onResend: () async {
+                try {
+                  // Récupérer le nouveau code OTP en mode test
+                  final newTestCode = await consentProvider.requestConsentOtp(widget.consent.id);
+                  setState(() {
+                    currentTestCode = newTestCode;
+                  });
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(newTestCode != null 
+                            ? 'Code renvoyé avec succès (mode test: $newTestCode)'
+                            : 'Code renvoyé avec succès'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Erreur: ${e.toString()}'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                }
+              },
+              onSubmit: (code) {
+                Navigator.of(context).pop(code);
+              },
+            ),
+          );
+        },
       ),
     );
   }

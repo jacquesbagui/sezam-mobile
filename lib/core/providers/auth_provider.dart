@@ -16,12 +16,15 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   bool _requiresOtp = false;
   String? _otpEmail;
+  String? _otpType;
+  String? _otpCode; // Code OTP pour les tests
 
   UserModel? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get requiresOtp => _requiresOtp;
   String? get otpEmail => _otpEmail;
+  String? get otpCode => _otpCode; // Code OTP pour les tests
   bool get isAuthenticated => _currentUser != null && _tokenStorage.getToken() != null;
 
   AuthProvider() {
@@ -93,10 +96,13 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
 
-      await _authService.register(request);
+      final response = await _authService.register(request);
       // Après inscription, OTP requis pour activer le compte
       _requiresOtp = true;
       _otpEmail = email;
+      _otpType = 'email_verification';
+      // Récupérer le code OTP pour les tests si disponible
+      _otpCode = response.otpCode;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -119,7 +125,11 @@ class AuthProvider extends ChangeNotifier {
         // OTP requis
         _requiresOtp = true;
         _otpEmail = identifier; // Peut être email ou téléphone, on assume email pour OTP
+        _otpType = 'login';
       } else {
+        // Récupérer l'utilisateur depuis le storage (le token est déjà enregistré par login)
+        _currentUser = await _authService.getCurrentUser();
+        
         // Enregistrer le device après connexion réussie
         await _registerDevice();
       }
@@ -133,7 +143,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Vérification OTP
-  Future<void> verifyOtp(String code) async {
+  Future<void> verifyOtp(String code, {String? otpType}) async {
     if (_otpEmail == null) return;
     
     _clearError();
@@ -141,12 +151,32 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _authService.verifyOtp(_otpEmail!, code);
+      // Utiliser le type d'OTP stocké ou celui fourni en paramètre, ou par défaut email_verification
+      final type = otpType ?? _otpType ?? 'email_verification';
+      
+      await _authService.verifyOtp(_otpEmail!, code, otpType: type);
       _requiresOtp = false;
       _otpEmail = null;
+      _otpType = null;
       _isLoading = false;
       
-      // Enregistrer le device après vérification OTP réussie
+      // S'assurer que le storage est initialisé
+      await _tokenStorage.init();
+      
+      // Récupérer l'utilisateur depuis le storage (le token est déjà enregistré par verifyOtp)
+      // Le userStream devrait déjà avoir mis à jour _currentUser, mais on s'assure qu'il est bien chargé
+      _currentUser = await _authService.getCurrentUser();
+      
+      // Vérifier que le token est bien disponible
+      final token = _tokenStorage.getToken();
+      if (token == null) {
+        print('⚠️ Token non disponible après vérification OTP');
+        throw AuthenticationException('Erreur d\'authentification: token non disponible');
+      }
+      
+      print('✅ Token disponible après vérification OTP: ${token.substring(0, 20)}...');
+      
+      // Enregistrer le device après vérification OTP réussie et chargement de l'utilisateur
       await _registerDevice();
       
       notifyListeners();
@@ -203,32 +233,72 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  bool _isRefreshingUser = false;
+  
   /// Recharger l'utilisateur depuis le backend
   Future<void> refreshUser() async {
+    // Éviter les appels multiples simultanés
+    if (_isRefreshingUser) {
+      print('⚠️ refreshUser déjà en cours, ignoré');
+      return;
+    }
+    
+    _isRefreshingUser = true;
     try {
       await _authService.refreshUser();
       _currentUser = await _authService.getCurrentUser();
       notifyListeners();
     } catch (e) {
-      print('Erreur lors du rechargement de l\'utilisateur: $e');
+      print('❌ Erreur lors du rechargement de l\'utilisateur: $e');
+    } finally {
+      _isRefreshingUser = false;
     }
   }
 
   /// Enregistrer le device pour les notifications push
   Future<void> _registerDevice() async {
     try {
-      final pushService = PushNotificationService();
+      // S'assurer que le storage est initialisé
+      await _tokenStorage.init();
+      
+      // Vérifier que l'utilisateur est authentifié avant d'enregistrer le device
+      if (_currentUser == null) {
+        print('⚠️ Utilisateur non authentifié, enregistrement du device différé');
+        return;
+      }
+      
+      // Vérifier que le token d'authentification est disponible
+      final authToken = _tokenStorage.getToken();
+      if (authToken == null) {
+        print('⚠️ Token d\'authentification non disponible, enregistrement du device différé');
+        return;
+      }
+      
+      print('🔑 Token d\'authentification disponible: ${authToken.substring(0, 20)}...');
+      
+      final pushService = PushNotificationService.instance;
       final token = await pushService.getToken();
       if (token != null) {
-        await pushService.registerDeviceToken(token);
-        print('✅ Device enregistré avec succès');
+        final success = await pushService.registerDeviceToken(token);
+        if (success) {
+          print('✅ Device enregistré avec succès');
+        } else {
+          print('⚠️ Échec de l\'enregistrement du device');
+        }
       } else {
         print('⚠️ Aucun token FCM disponible');
       }
     } catch (e) {
       // On ignore silencieusement les erreurs d'enregistrement du device
-      print('⚠️ Erreur lors de l\'enregistrement du device: $e');
-      print('   L\'app fonctionne mais les notifications push ne sont pas disponibles');
+      // L'erreur "Unauthenticated" peut survenir si le token n'est pas encore disponible
+      if (e.toString().contains('Unauthenticated') || 
+          e.toString().contains('401') ||
+          e.toString().contains('unauthenticated')) {
+        print('⚠️ Authentification non encore disponible, enregistrement du device différé');
+      } else {
+        print('⚠️ Erreur lors de l\'enregistrement du device: $e');
+        print('   L\'app fonctionne mais les notifications push ne sont pas disponibles');
+      }
     }
   }
 

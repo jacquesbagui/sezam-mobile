@@ -4,6 +4,7 @@ import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
 import 'package:sezam/core/models/consent_model.dart';
+import 'package:sezam/core/models/scope_model.dart';
 import 'package:sezam/core/providers/consent_provider.dart';
 import 'package:sezam/core/services/app_event_service.dart';
 
@@ -323,8 +324,33 @@ class ConnectionDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!isActive)
+                    if (_isScopeRequired(scope))
                       Container(
+                        margin: const EdgeInsets.only(left: AppSpacing.spacing2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.spacing2,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          'Requis',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.warning,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    if (!isActive && !_isScopeRequired(scope))
+                      Container(
+                        margin: const EdgeInsets.only(left: AppSpacing.spacing2),
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.spacing2,
                           vertical: 2,
@@ -364,11 +390,15 @@ class ConnectionDetailScreen extends StatelessWidget {
                 ? IconButton(
                     icon: Icon(
                       Icons.remove_circle_outline,
-                      color: AppColors.error,
+                      color: _isScopeRequired(scope) ? AppColors.gray400 : AppColors.error,
                       size: 22,
                     ),
-                    onPressed: () => _showRemoveScopeDialog(context, scope),
-                    tooltip: 'Désactiver ce scope',
+                    onPressed: _isScopeRequired(scope) 
+                        ? null 
+                        : () => _showRemoveScopeDialog(context, scope),
+                    tooltip: _isScopeRequired(scope) 
+                        ? 'Ce scope est requis et ne peut pas être désactivé' 
+                        : 'Désactiver ce scope',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   )
@@ -512,6 +542,47 @@ class ConnectionDetailScreen extends StatelessWidget {
 
   /// Afficher le dialog de confirmation pour retirer un scope
   void _showRemoveScopeDialog(BuildContext context, dynamic scope) {
+    // Vérifier si le scope est requis
+    if (_isScopeRequired(scope)) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: AppColors.warning, size: 28),
+              const SizedBox(width: AppSpacing.spacing2),
+              Expanded(
+                child: Text(
+                  'Scope requis',
+                  style: AppTypography.headline4.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Ce scope fait partie de la demande initiale et ne peut pas être désactivé.',
+            style: AppTypography.bodyMedium.copyWith(
+              color: AppColors.gray700,
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Compris'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -608,7 +679,7 @@ class ConnectionDetailScreen extends StatelessWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Erreur: $e'),
+                      content: Text('Erreur: ${e.toString()}'),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -763,6 +834,28 @@ class ConnectionDetailScreen extends StatelessWidget {
   bool _isActive() {
     return consent.revokedAt == null &&
            (consent.expiresAt == null || consent.expiresAt!.isAfter(DateTime.now()));
+  }
+
+  /// Vérifier si un scope est requis (ne peut pas être désactivé)
+  bool _isScopeRequired(dynamic scope) {
+    // Si c'est un objet ScopeModel, vérifier la propriété
+    if (scope is ScopeModel) {
+      return scope.isRequired;
+    }
+    // Vérifier si le scope a la propriété is_required (Map ou autre)
+    if (scope is Map) {
+      return scope['is_required'] == true;
+    }
+    // Sinon, essayer d'accéder via toJson() si disponible
+    try {
+      if (scope != null && scope.runtimeType.toString().contains('Scope')) {
+        final scopeMap = scope.toJson();
+        return scopeMap['is_required'] == true;
+      }
+    } catch (e) {
+      // Si la propriété n'existe pas, retourner false
+    }
+    return false;
   }
 
   /// Afficher le dialog de révocation

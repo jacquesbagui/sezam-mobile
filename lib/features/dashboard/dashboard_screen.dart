@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
@@ -19,6 +20,7 @@ import 'package:sezam/core/models/user_model.dart';
 import 'package:sezam/core/models/consent_model.dart';
 import 'package:sezam/core/services/profile_service.dart';
 import 'package:sezam/core/services/app_event_service.dart';
+import 'package:sezam/core/utils/navigation_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -46,30 +48,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           children: [
             Expanded(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: [
-                  DashboardHomeScreen(
-                    onNavigateToDocuments: () => setState(() => _currentIndex = 1),
-                    onNavigateToRequests: () => setState(() => _currentIndex = 2),
-                    onShowConnections: _showConnectionsInfo,
-                    onShowAlerts: _showAlertsInfo,
-                    onNavigateToNotifications: () => setState(() => _currentIndex = 3),
-                  ),
-                  DocumentsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0)),
-                  RequestsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0)),
-                  NotificationsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0)),
-                  ProfileScreen(onBackToDashboard: () => setState(() => _currentIndex = 0)),
-                ],
+              child: RepaintBoundary(
+                child: _buildCurrentScreen(),
               ),
             ),
-            SezamBottomNavigation(
-              currentIndex: _currentIndex,
-              onTap: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
+            RepaintBoundary(
+              child: SezamBottomNavigation(
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  // Feedback haptique pour une meilleure réactivité perçue
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+              ),
             ),
           ],
         ),
@@ -77,12 +70,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// Construire l'écran actuel (optimisation: ne construit que l'écran visible)
+  Widget _buildCurrentScreen() {
+    switch (_currentIndex) {
+      case 0:
+        return DashboardHomeScreen(
+          onNavigateToDocuments: () => setState(() => _currentIndex = 1),
+          onNavigateToRequests: () => setState(() => _currentIndex = 2),
+          onShowConnections: _showConnectionsInfo,
+          onShowAlerts: _showAlertsInfo,
+          onNavigateToNotifications: () => setState(() => _currentIndex = 3),
+        );
+      case 1:
+        return DocumentsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0));
+      case 2:
+        return RequestsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0));
+      case 3:
+        return NotificationsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0));
+      case 4:
+        return ProfileScreen(onBackToDashboard: () => setState(() => _currentIndex = 0));
+      default:
+        return DashboardHomeScreen(
+          onNavigateToDocuments: () => setState(() => _currentIndex = 1),
+          onNavigateToRequests: () => setState(() => _currentIndex = 2),
+          onShowConnections: _showConnectionsInfo,
+          onShowAlerts: _showAlertsInfo,
+          onNavigateToNotifications: () => setState(() => _currentIndex = 3),
+        );
+    }
+  }
+
   /// Afficher les informations de connexions
   void _showConnectionsInfo() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const ConnectionsScreen(),
+      NavigationHelper.slideRoute(
+        const ConnectionsScreen(),
       ),
     );
   }
@@ -216,15 +239,13 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         // Rafraîchir l'utilisateur pour avoir les données à jour (notamment verified_at)
         authProvider.refreshUser().catchError((e) => print('Erreur refreshUser: $e'));
         
-        // Charger le statut du profil pour la bannière
-        profileProvider.loadProfileStatus().catchError((e) => print('Erreur loadProfileStatus: $e'));
+        // Charger le statut du profil seulement si nécessaire (cache invalide)
+        profileProvider.loadIfNeeded().catchError((e) => print('Erreur loadProfileStatus: $e'));
         
-        // Charger les consents si pas déjà chargés
-        if (!_hasLoadedConsents && 
-            !consentProvider.isLoading && 
-            consentProvider.errorMessage == null) {
+        // Charger les consents seulement si nécessaire (cache invalide)
+        if (!_hasLoadedConsents) {
           _hasLoadedConsents = true;
-          consentProvider.loadConsents();
+          consentProvider.loadIfNeeded();
         }
       }
     });
@@ -315,19 +336,25 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
           ),
           child: user.profileImage != null && user.profileImage!.isNotEmpty
               ? ClipOval(
-                  child: Image.network(
-                    user.profileImage!,
+                  child: CachedNetworkImage(
+                    imageUrl: user.profileImage!,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: AppColors.primary,
-                        child: const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      );
-                    },
+                    placeholder: (context, url) => Container(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      color: AppColors.primary,
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
                   ),
                 )
               : Container(
@@ -389,13 +416,14 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         // Boutons d'action
         Row(
           children: [
-            Consumer<NotificationProvider>(
-              builder: (context, notificationProvider, child) {
+            Selector<NotificationProvider, int>(
+              selector: (_, provider) => provider.unreadCount,
+              builder: (context, unreadCount, child) {
                 return _buildIconButton(
                   icon: Icons.notifications_outlined,
                   onTap: widget.onNavigateToNotifications,
-                  hasNotification: notificationProvider.unreadCount > 0,
-                  notificationCount: notificationProvider.unreadCount,
+                  hasNotification: unreadCount > 0,
+                  notificationCount: unreadCount,
                 );
               },
             ),
@@ -469,15 +497,24 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
 
   /// Bannière d'information sur le statut du profil
   Widget _buildProfileStatusBanner(BuildContext context, UserModel user) {
-    return Consumer<ProfileProvider>(
-      builder: (context, profileProvider, child) {
-        final profile = user.profile;
-        final isProfileVerified = profile != null && profile['verified_at'] != null;
-        final hasUserCode = user.userCode != null;
-        final isKycComplete = profileProvider.isComplete;
-        final completionPercentage = profileProvider.completionPercentage;
-        final missingFields = profileProvider.missingFields;
-        final profileStatus = profileProvider.profileStatus;
+    return RepaintBoundary(
+      child: Selector<ProfileProvider, Map<String, dynamic>>(
+        selector: (_, provider) => {
+          'isLoading': provider.isLoading,
+          'isComplete': provider.isComplete,
+          'completionPercentage': provider.completionPercentage,
+          'missingFields': provider.missingFields,
+          'profileStatus': provider.profileStatus,
+        },
+        builder: (context, state, child) {
+          final profile = user.profile;
+          final isProfileVerified = profile != null && profile['verified_at'] != null;
+          final hasUserCode = user.userCode != null;
+          final isKycComplete = state['isComplete'] as bool;
+          final completionPercentage = state['completionPercentage'] as int;
+          final missingFields = state['missingFields'] as List<String>;
+          final profileStatus = state['profileStatus'] as dynamic;
+          final isLoading = state['isLoading'] as bool;
 
         print('🔍 _buildProfileStatusBanner:');
         print('   - isKycComplete: $isKycComplete');
@@ -488,7 +525,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
         print('   - hasUserCode: $hasUserCode');
         
         // Si le statut est en cours de chargement, afficher un message générique
-        if (profileProvider.isLoading || profileStatus == null) {
+        if (isLoading || profileStatus == null) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing6),
             child: Container(
@@ -679,7 +716,8 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
             ),
           ),
         );
-      },
+        },
+      ),
     );
   }
 
@@ -1015,15 +1053,15 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                       onTap: widget.onNavigateToDocuments,
                     ),
                     const SizedBox(height: AppSpacing.spacing3),
-                    Builder(
-                      builder: (context) {
-                        final consentProvider = Provider.of<ConsentProvider>(context, listen: true);
+                    Selector<ConsentProvider, int>(
+                      selector: (_, provider) => provider.pendingConsents.length,
+                      builder: (context, pendingCount, child) {
                         return _buildActionCard(
                           icon: Icons.schedule_outlined,
                           iconColor: AppColors.warning,
                           iconBgColor: AppColors.warning.withValues(alpha: 0.1),
                           label: 'Demandes en attente',
-                          badge: consentProvider.pendingConsents.length > 0 ? consentProvider.pendingConsents.length : null,
+                          badge: pendingCount > 0 ? pendingCount : null,
                           onTap: widget.onNavigateToRequests,
                         );
                       },
@@ -1057,15 +1095,15 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                     label: 'Ajouter un\ndocument',
                     onTap: widget.onNavigateToDocuments,
                   ),
-                  Builder(
-                    builder: (context) {
-                      final consentProvider = Provider.of<ConsentProvider>(context, listen: true);
+                  Selector<ConsentProvider, int>(
+                    selector: (_, provider) => provider.pendingConsents.length,
+                    builder: (context, pendingCount, child) {
                       return _buildActionCard(
                         icon: Icons.schedule_outlined,
                         iconColor: AppColors.warning,
                         iconBgColor: AppColors.warning.withValues(alpha: 0.1),
                         label: 'Demandes en\nattente',
-                        badge: consentProvider.pendingConsents.length > 0 ? consentProvider.pendingConsents.length : null,
+                        badge: pendingCount > 0 ? pendingCount : null,
                         onTap: widget.onNavigateToRequests,
                       );
                     },
@@ -1238,9 +1276,14 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
           const SizedBox(height: AppSpacing.spacing4),
           
           // Charger et afficher les consents
-          Consumer<ConsentProvider>(
-            builder: (context, consentProvider, child) {
-              if (consentProvider.isLoading) {
+          Selector<ConsentProvider, Map<String, dynamic>>(
+            selector: (_, provider) => {
+              'isLoading': provider.isLoading,
+              'errorMessage': provider.errorMessage,
+              'activeConsentsCount': provider.activeConsents.length,
+            },
+            builder: (context, state, child) {
+              if (state['isLoading'] as bool) {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(AppSpacing.spacing8),
@@ -1249,7 +1292,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 );
               }
 
-              if (consentProvider.errorMessage != null) {
+              if (state['errorMessage'] != null) {
                 return Container(
                   padding: const EdgeInsets.all(AppSpacing.spacing4),
                   decoration: BoxDecoration(
@@ -1262,7 +1305,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.error_outline,
                         color: AppColors.error,
                         size: 20,
@@ -1270,7 +1313,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                       const SizedBox(width: AppSpacing.spacing3),
                       Expanded(
                         child: Text(
-                          consentProvider.errorMessage!,
+                          state['errorMessage'] as String,
                           style: AppTypography.bodyMedium.copyWith(
                             color: AppColors.error,
                           ),
@@ -1281,7 +1324,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 );
               }
 
-              // Afficher uniquement les consents accordés (granted) comme connexions
+              final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
               final recentConsents = consentProvider.activeConsents.take(5).toList();
 
               if (recentConsents.isEmpty) {
@@ -1297,7 +1340,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.info_outline,
                         color: AppColors.gray500,
                         size: 20,
@@ -1316,14 +1359,17 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 );
               }
 
-              // Afficher la liste des connexions récentes
-              return Column(
-                children: recentConsents.map((consent) {
+              // Afficher la liste des connexions récentes avec ListView.builder pour le lazy loading
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: recentConsents.length,
+                itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.spacing3),
-                    child: _buildConnectionItem(consent),
+                    child: _buildConnectionItem(recentConsents[index]),
                   );
-                }).toList(),
+                },
               );
             },
           ),

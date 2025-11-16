@@ -30,7 +30,8 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
   Future<void> _loadConnections() async {
     if (!mounted || _hasLoaded) return;
     final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
-    await consentProvider.loadConsents();
+    // Utiliser loadIfNeeded() pour éviter le rechargement inutile
+    await consentProvider.loadIfNeeded();
     if (mounted) {
       setState(() {
         _hasLoaded = true;
@@ -119,14 +120,15 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
 
   /// Liste des connexions
   Widget _buildConnectionsList() {
-    return Consumer<ConsentProvider>(
-      builder: (context, consentProvider, child) {
+    return Selector<ConsentProvider, List<ConsentModel>>(
+      selector: (_, provider) => provider.consents,
+      builder: (context, allConsents, child) {
         List<ConsentModel> consents;
         
         switch (_selectedTabIndex) {
           case 0:
             // Consents actifs (granted, non expirés, non révoqués, et pas en attente de révocation)
-            consents = consentProvider.consents.where((c) {
+            consents = allConsents.where((c) {
               return c.isGranted && 
                      (c.expiresAt == null || c.expiresAt!.isAfter(DateTime.now())) &&
                      c.revokedAt == null &&
@@ -135,7 +137,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
             break;
           case 1:
             // Consents expirés
-            consents = consentProvider.consents.where((c) {
+            consents = allConsents.where((c) {
               return c.isGranted && 
                      c.expiresAt != null && 
                      c.expiresAt!.isBefore(DateTime.now()) &&
@@ -145,7 +147,7 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
             break;
           case 2:
             // Consents révoqués ou en attente de révocation
-            consents = consentProvider.consents.where((c) {
+            consents = allConsents.where((c) {
               return c.revokedAt != null || 
                      c.statusName.toLowerCase().contains('revocation');
             }).toList();

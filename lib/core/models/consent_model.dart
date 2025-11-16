@@ -55,10 +55,41 @@ class ConsentModel {
   Map<String, dynamic> toJson() => _$ConsentModelToJson(this);
   
   String get partnerName => partner?['name'] ?? 'Inconnu';
-  String get statusName => status?['name'] ?? 'inconnu';
+  
+  /// Obtenir le nom du statut (gère différents formats possibles)
+  String get statusName {
+    if (status == null) {
+      // Si pas de statut mais qu'il y a des dates, déterminer le statut
+      if (grantedAt != null) return 'granted';
+      if (deniedAt != null) return 'denied';
+      if (revokedAt != null) return 'revoked';
+      // Par défaut, si aucune date et pas de statut, considérer comme pending
+      return 'pending';
+    }
+    
+    // Essayer différents formats possibles
+    final name = status?['name'];
+    if (name != null && name is String) {
+      return name.toLowerCase();
+    }
+    
+    // Essayer avec 'status' directement
+    final directStatus = status?['status'];
+    if (directStatus != null && directStatus is String) {
+      return directStatus.toLowerCase();
+    }
+    
+    // Fallback: déterminer par les dates
+    if (grantedAt != null) return 'granted';
+    if (deniedAt != null) return 'denied';
+    if (revokedAt != null) return 'revoked';
+    
+    return 'pending';
+  }
+  
   bool get isGranted => statusName == 'granted';
   bool get isPending => statusName == 'pending';
-  bool get isDenied => statusName == 'denied';
+  bool get isDenied => statusName == 'denied' || statusName == 'refused';
   bool get isExpired => expiresAt != null && DateTime.now().isAfter(expiresAt!);
   
   int get scopesCount => scopes?.length ?? 0;

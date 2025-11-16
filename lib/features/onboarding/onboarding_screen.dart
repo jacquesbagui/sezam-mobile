@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -55,10 +56,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() async {
+    // Feedback haptique pour une meilleure réactivité perçue
+    HapticFeedback.selectionClick();
+    
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
-        duration: AppSpacing.animationNormal,
-        curve: AppSpacing.animationCurve,
+        duration: const Duration(milliseconds: 200), // Plus rapide que 300ms
+        curve: Curves.easeOutCubic, // Courbe plus fluide
       );
     } else {
       // Marquer que l'onboarding a été vu
@@ -69,9 +73,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         // Si non, rediriger vers auth
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         if (authProvider.isAuthenticated) {
-          // Utilisateur connecté, vérifier le statut du profil
+          // Utilisateur connecté, vérifier le statut du profil (utiliser cache)
           final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-          await profileProvider.loadProfileStatus();
+          await profileProvider.loadIfNeeded(); // Utiliser cache si disponible
           
           if (!mounted) return;
           
@@ -89,6 +93,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _skipOnboarding() async {
+    // Feedback haptique
+    HapticFeedback.lightImpact();
+    
     // Marquer que l'onboarding a été vu
     await TokenStorageService.instance.setHasSeenOnboarding(true);
     if (mounted) {
@@ -97,9 +104,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Si non, rediriger vers auth
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (authProvider.isAuthenticated) {
-        // Utilisateur connecté, vérifier le statut du profil
+        // Utilisateur connecté, vérifier le statut du profil (utiliser cache)
         final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
-        await profileProvider.loadProfileStatus();
+        await profileProvider.loadIfNeeded(); // Utiliser cache si disponible
         
         if (!mounted) return;
         
@@ -126,56 +133,74 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           children: [
             // Header avec bouton Skip
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.spacing4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox(width: 60), // Espace pour centrer le titre
-                  Text(
-                    'SEZAM',
-                    style: AppTypography.headline3.copyWith(
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _skipOnboarding,
-                    child: Text(
-                      'Passer',
-                      style: AppTypography.button.copyWith(
-                        color: AppColors.primary,
+            RepaintBoundary(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.spacing4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 60), // Espace pour centrer le titre
+                    Text(
+                      'SEZAM',
+                      style: AppTypography.headline3.copyWith(
+                        color: AppColors.textPrimaryLight,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                ],
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _skipOnboarding,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.spacing3,
+                            vertical: AppSpacing.spacing2,
+                          ),
+                          child: Text(
+                            'Passer',
+                            style: AppTypography.button.copyWith(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             
             // Contenu des pages
             Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemCount: _pages.length,
-                itemBuilder: (context, index) {
-                  return _buildOnboardingPage(_pages[index]);
-                },
+              child: RepaintBoundary(
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemCount: _pages.length,
+                  itemBuilder: (context, index) {
+                    return RepaintBoundary(
+                      child: _buildOnboardingPage(_pages[index]),
+                    );
+                  },
+                ),
               ),
             ),
             
             // Indicateurs de page
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacing6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  _pages.length,
-                  (index) => _buildPageIndicator(index),
+            RepaintBoundary(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacing6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    _pages.length,
+                    (index) => _buildPageIndicator(index),
+                  ),
                 ),
               ),
             ),
@@ -187,23 +212,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   if (_currentPage > 0)
                     Expanded(
-                      child: SezamButton(
-                        text: 'Précédent',
-                        variant: SezamButtonVariant.outline,
-                        onPressed: () {
-                          _pageController.previousPage(
-                            duration: AppSpacing.animationNormal,
-                            curve: AppSpacing.animationCurve,
-                          );
-                        },
+                      child: RepaintBoundary(
+                        child: SezamButton(
+                          text: 'Précédent',
+                          variant: SezamButtonVariant.outline,
+                          onPressed: () {
+                            HapticFeedback.selectionClick();
+                            _pageController.previousPage(
+                              duration: const Duration(milliseconds: 200), // Plus rapide
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                        ),
                       ),
                     ),
                   if (_currentPage > 0) const SizedBox(width: AppSpacing.spacing4),
                   Expanded(
-                    child: SezamButton(
-                      text: _currentPage == _pages.length - 1 ? 'Commencer' : 'Suivant',
-                      onPressed: _nextPage,
-                      isFullWidth: true,
+                    child: RepaintBoundary(
+                      child: SezamButton(
+                        text: _currentPage == _pages.length - 1 ? 'Commencer' : 'Suivant',
+                        onPressed: _nextPage,
+                        isFullWidth: true,
+                      ),
                     ),
                   ),
                 ],
@@ -216,15 +246,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildOnboardingPage(OnboardingPage page) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.spacing6),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icône
+          // Icône (sans animation lourde pour meilleure performance)
           Container(
             width: 120,
             height: 120,
@@ -244,7 +271,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.title,
             style: AppTypography.headline2.copyWith(
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: AppColors.textPrimaryLight,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -255,7 +282,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             page.description,
             style: AppTypography.bodyLarge.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: AppColors.textSecondaryLight,
               height: 1.5,
             ),
             textAlign: TextAlign.center,
@@ -266,19 +293,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildPageIndicator(int index) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final isActive = index == _currentPage;
 
     return AnimatedContainer(
-      duration: AppSpacing.animationFast,
+      duration: const Duration(milliseconds: 200), // Plus rapide
+      curve: Curves.easeOutCubic,
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing1),
       width: isActive ? 24 : 8,
       height: 8,
       decoration: BoxDecoration(
         color: isActive
             ? AppColors.primary
-            : (isDark ? AppColors.gray600 : AppColors.gray300),
+            : AppColors.gray300,
         borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
       ),
     );

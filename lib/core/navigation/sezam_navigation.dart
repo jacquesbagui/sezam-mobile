@@ -5,7 +5,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../providers/consent_provider.dart';
-import '../providers/notification_provider.dart';
 
 /// Navigation principale de l'application SEZAM
 class SezamBottomNavigation extends StatelessWidget {
@@ -23,65 +22,68 @@ class SezamBottomNavigation extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        boxShadow: AppSpacing.shadowLg,
-        border: Border(
-          top: BorderSide(
-            color: isDark ? AppColors.gray700 : AppColors.gray200,
-            width: 1,
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          boxShadow: AppSpacing.shadowLg,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? AppColors.gray700 : AppColors.gray200,
+              width: 1,
+            ),
           ),
         ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: AppSpacing.spacing4,
-          right: AppSpacing.spacing4,
-          top: AppSpacing.spacing2,
-          bottom: MediaQuery.of(context).padding.bottom + AppSpacing.spacing2,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(
-              context,
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home,
-              label: 'Accueil',
-              index: 0,
-              isActive: currentIndex == 0,
-            ),
-            _buildNavItem(
-              context,
-              icon: Icons.description_outlined,
-              activeIcon: Icons.description,
-              label: 'Documents',
-              index: 1,
-              isActive: currentIndex == 1,
-            ),
-            Consumer<ConsentProvider>(
-              builder: (context, consentProvider, child) {
-                return _buildNavItem(
-                  context,
-                  icon: Icons.request_page_outlined,
-                  activeIcon: Icons.request_page,
-                  label: 'Demandes',
-                  index: 2,
-                  isActive: currentIndex == 2,
-                  hasNotification: consentProvider.pendingConsents.isNotEmpty,
-                );
-              },
-            ),
-            _buildNavItem(
-              context,
-              icon: Icons.person_outline,
-              activeIcon: Icons.person,
-              label: 'Profil',
-              index: 4,
-              isActive: currentIndex == 4,
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.spacing4,
+            right: AppSpacing.spacing4,
+            top: AppSpacing.spacing2,
+            bottom: MediaQuery.of(context).padding.bottom + AppSpacing.spacing2,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                context,
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home,
+                label: 'Accueil',
+                index: 0,
+                isActive: currentIndex == 0,
+              ),
+              _buildNavItem(
+                context,
+                icon: Icons.description_outlined,
+                activeIcon: Icons.description,
+                label: 'Documents',
+                index: 1,
+                isActive: currentIndex == 1,
+              ),
+              Selector<ConsentProvider, bool>(
+                selector: (_, provider) => provider.pendingConsents.isNotEmpty,
+                builder: (context, hasNotification, child) {
+                  return _buildNavItem(
+                    context,
+                    icon: Icons.request_page_outlined,
+                    activeIcon: Icons.request_page,
+                    label: 'Demandes',
+                    index: 2,
+                    isActive: currentIndex == 2,
+                    hasNotification: hasNotification,
+                  );
+                },
+              ),
+              _buildNavItem(
+                context,
+                icon: Icons.person_outline,
+                activeIcon: Icons.person,
+                label: 'Profil',
+                index: 4,
+                isActive: currentIndex == 4,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -95,56 +97,74 @@ class SezamBottomNavigation extends StatelessWidget {
     required int index,
     required bool isActive,
     bool hasNotification = false,
-    int? notificationCount,
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final activeColor = AppColors.primary;
+    final inactiveColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
 
-    return GestureDetector(
-      onTap: () => onTap?.call(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.spacing3,
-          vertical: AppSpacing.spacing2,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
+    return RepaintBoundary(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap?.call(index);
+          },
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.spacing3,
+              vertical: AppSpacing.spacing2,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  isActive ? activeIcon : icon,
-                  size: 24,
-                  color: isActive
-                      ? AppColors.primary
-                      : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                ),
-                if (hasNotification)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.error,
-                        shape: BoxShape.circle,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      transitionBuilder: (child, animation) {
+                        return ScaleTransition(
+                          scale: animation,
+                          child: child,
+                        );
+                      },
+                      child: Icon(
+                        isActive ? activeIcon : icon,
+                        key: ValueKey('$index-$isActive'),
+                        size: 24,
+                        color: isActive ? activeColor : inactiveColor,
                       ),
                     ),
+                    if (hasNotification)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.spacing1),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 150),
+                  style: AppTypography.caption.copyWith(
+                    color: isActive ? activeColor : inactiveColor,
+                    fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                   ),
+                  child: Text(label),
+                ),
               ],
             ),
-            const SizedBox(height: AppSpacing.spacing1),
-            Text(
-              label,
-              style: AppTypography.caption.copyWith(
-                color: isActive
-                    ? AppColors.primary
-                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

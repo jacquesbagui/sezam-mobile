@@ -20,7 +20,6 @@ class RequestsScreen extends StatefulWidget {
 class _RequestsScreenState extends State<RequestsScreen> {
   int _selectedTabIndex = 0;
   final List<String> _tabs = ['En attente', 'Refusées'];
-  bool _hasLoaded = false;
 
   @override
   void initState() {
@@ -31,13 +30,15 @@ class _RequestsScreenState extends State<RequestsScreen> {
     });
   }
 
-
   Future<void> _loadConsents() async {
     if (!mounted) return;
+    print('🔄 RequestsScreen: Chargement des consentements...');
     final consentProvider = Provider.of<ConsentProvider>(context, listen: false);
-    if (!_hasLoaded) {
-      await consentProvider.loadConsents();
-      _hasLoaded = true;
+    // Forcer le rechargement pour s'assurer d'avoir les dernières données
+    await consentProvider.refresh();
+    if (mounted) {
+      print('📊 RequestsScreen: ${consentProvider.pendingConsents.length} en attente, ${consentProvider.deniedConsents.length} refusées');
+      print('📊 Total: ${consentProvider.consents.length} consentement(s)');
     }
   }
 

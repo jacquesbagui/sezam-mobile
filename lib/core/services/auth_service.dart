@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../models/auth_models.dart';
 import '../models/user_model.dart';
+import '../models/api_response.dart';
 import '../config/api_config.dart';
 import 'api_client.dart';
 import 'token_storage_service.dart';
@@ -22,7 +23,7 @@ class AuthService {
         _userStreamController = StreamController<UserModel?>.broadcast();
 
   /// Inscription d'un nouvel utilisateur
-  Future<void> register(RegisterRequest request) async {
+  Future<ApiResponse<UserModel>> register(RegisterRequest request) async {
     try {
       // Le backend exige le champ password_confirmation lors de l'inscription
       // Nous l'ajoutons explicitement au payload sans modifier le modèle généré
@@ -47,6 +48,9 @@ class AuthService {
         await _tokenStorage.saveUser(response.data!);
         _userStreamController.add(response.data);
       }
+      
+      // Retourner la réponse avec le code OTP si disponible (pour les tests)
+      return response;
     } catch (e) {
       if (e is ApiException) {
         throw AuthenticationException(e.message);
@@ -100,9 +104,16 @@ class AuthService {
   }
 
   /// Vérification du code OTP
-  Future<void> verifyOtp(String email, String code) async {
+  Future<void> verifyOtp(String identifier, String code, {String? otpType}) async {
     try {
-      final request = VerifyOtpRequest(email: email, code: code);
+      // Déterminer le type d'OTP si non fourni
+      final type = otpType ?? 'email_verification';
+      
+      final request = VerifyOtpRequest(
+        identifier: identifier,
+        otpType: type,
+        code: code,
+      );
 
       final response = await _apiClient.post<UserModel>(
         ApiConfig.verifyOtp,

@@ -21,8 +21,17 @@ class NotificationProvider with ChangeNotifier {
   /// Nombre de notifications non lues
   int get unreadCount => unreadNotifications.length;
 
+  bool _isRefreshing = false;
+  
   /// Charger les notifications
   Future<void> loadNotifications({bool unreadOnly = false}) async {
+    // Éviter les appels multiples simultanés
+    if (_isRefreshing) {
+      print('⚠️ NotificationProvider: Chargement déjà en cours, ignoré');
+      return;
+    }
+    
+    _isRefreshing = true;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -32,13 +41,20 @@ class NotificationProvider with ChangeNotifier {
         unreadOnly: unreadOnly,
       );
       _errorMessage = null;
+      print('✅ NotificationProvider: ${_notifications.length} notification(s) chargée(s), ${unreadCount} non lue(s)');
     } catch (e) {
       _errorMessage = e.toString();
-      print('Erreur loadNotifications: $e');
+      print('❌ Erreur loadNotifications: $e');
     } finally {
       _isLoading = false;
+      _isRefreshing = false;
       notifyListeners();
     }
+  }
+  
+  /// Rafraîchir les notifications (alias pour loadNotifications)
+  Future<void> refresh() async {
+    await loadNotifications();
   }
 
   /// Marquer une notification comme lue

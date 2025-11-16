@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
 import 'package:sezam/core/services/document_service.dart';
-import 'package:sezam/core/providers/document_provider.dart';
-import 'package:sezam/core/services/app_event_service.dart';
 import 'package:sezam/core/services/exceptions.dart';
 import 'package:sezam/core/services/api_client.dart';
 
@@ -34,10 +31,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   String _selectedSource = 'Camera';
   File? _selectedFile;
   DateTime? _expiryDate;
-  bool _isLoading = false;
   bool _isUploading = false;
-  List<Map<String, dynamic>> _documentTypes = [];
-  String? _errorMessage;
 
   final List<String> _sourceTypes = [
     'Camera',
@@ -46,159 +40,56 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _loadDocumentTypes();
-  }
-
-  @override
   void dispose() {
     _documentNumberController.dispose();
     _expirationDateController.dispose();
     super.dispose();
   }
 
-  /// Charger les types de documents depuis l'API
-  Future<void> _loadDocumentTypes() async {
-    if (_isLoading) return; // Éviter les appels multiples
-    
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final requiredDocs = await _documentService.getRequiredDocuments();
-      
-      if (!mounted) return;
-      
-      print('📋 Documents reçus: ${requiredDocs.length}');
-      
-      // Filtrer et valider les documents
-      final validDocs = <Map<String, dynamic>>[];
-      for (final doc in requiredDocs) {
-        try {
-          final id = doc['id'];
-          final name = doc['name'] ?? doc['display_name'];
-          
-          if (id != null && name != null) {
-            final idStr = id.toString();
-            if (idStr.isNotEmpty) {
-              validDocs.add({
-                'id': idStr,
-                'name': name.toString(),
-                'display_name': doc['display_name']?.toString() ?? name.toString(),
-                'description': doc['description']?.toString(),
-              });
-            }
-          }
-        } catch (e) {
-          print('⚠️ Erreur parsing doc: $e, doc: $doc');
-        }
-      }
-      
-      print('✅ Documents valides: ${validDocs.length}');
-      
-      if (!mounted) {
-        print('⚠️ Widget non monté, arrêt du chargement');
-        return;
-      }
-      
-      print('🔄 Mise à jour du state...');
-      setState(() {
-        _documentTypes = validDocs;
-        if (_documentTypes.isNotEmpty) {
-          final firstDoc = _documentTypes.first;
-          _selectedDocumentTypeId = firstDoc['id'] as String;
-          _selectedDocumentTypeName = firstDoc['display_name'] as String? ?? 
-                                     firstDoc['name'] as String? ?? 'Document';
-          print('📌 Type sélectionné: $_selectedDocumentTypeName (id: $_selectedDocumentTypeId)');
-        } else {
-          _selectedDocumentTypeId = null;
-          _selectedDocumentTypeName = '';
-        }
-        _isLoading = false;
-        print('✅ _isLoading mis à false');
-      });
-      print('✅ setState terminé');
-    } catch (e, stackTrace) {
-      print('❌ Erreur _loadDocumentTypes: $e');
-      print('📋 Stack trace: $stackTrace');
-      if (mounted) {
-        setState(() {
-          _errorMessage = 'Erreur lors du chargement des types de documents';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gray50,
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(),
-          SliverToBoxAdapter(
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  if (_errorMessage != null) _buildErrorMessage(),
-                  _buildDocumentPreview(),
-                  const SizedBox(height: AppSpacing.spacing4),
-                  _buildDocumentTypeSection(),
-                  const SizedBox(height: AppSpacing.spacing4),
-                  _buildDocumentInfoSection(),
-                  const SizedBox(height: AppSpacing.spacing4),
-                  _buildSourceSection(),
-                  const SizedBox(height: AppSpacing.spacing8),
-                  _buildActionButtons(),
-                  const SizedBox(height: AppSpacing.spacing8),
-                ],
+      body: RepaintBoundary(
+        child: CustomScrollView(
+          slivers: [
+            _buildSliverAppBar(),
+            SliverToBoxAdapter(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    RepaintBoundary(child: _buildDocumentPreview()),
+                    const SizedBox(height: AppSpacing.spacing4),
+                    RepaintBoundary(
+                      child: _DocumentTypeSelector(
+                        documentService: _documentService,
+                        selectedTypeId: _selectedDocumentTypeId,
+                        onTypeSelected: (typeId, typeName) {
+                          setState(() {
+                            _selectedDocumentTypeId = typeId;
+                            _selectedDocumentTypeName = typeName;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.spacing4),
+                    RepaintBoundary(child: _buildDocumentInfoSection()),
+                    const SizedBox(height: AppSpacing.spacing4),
+                    RepaintBoundary(child: _buildSourceSection()),
+                    const SizedBox(height: AppSpacing.spacing8),
+                    RepaintBoundary(child: _buildActionButtons()),
+                    const SizedBox(height: AppSpacing.spacing8),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Message d'erreur
-  Widget _buildErrorMessage() {
-    return Container(
-      margin: const EdgeInsets.all(AppSpacing.spacing4),
-      padding: const EdgeInsets.all(AppSpacing.spacing4),
-      decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: AppColors.error),
-          const SizedBox(width: AppSpacing.spacing3),
-          Expanded(
-            child: Text(
-              _errorMessage!,
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.error,
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 20),
-            onPressed: () {
-              setState(() {
-                _errorMessage = null;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   /// AppBar avec effet de parallaxe
   Widget _buildSliverAppBar() {
@@ -401,172 +292,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     );
   }
 
-  /// Section type de document
-  Widget _buildDocumentTypeSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
-      padding: const EdgeInsets.all(AppSpacing.spacing4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: const Offset(0, 2),
-            blurRadius: 8,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.category,
-                color: AppColors.primary,
-                size: 20,
-              ),
-              const SizedBox(width: AppSpacing.spacing2),
-              Text(
-                'Type de document',
-                style: AppTypography.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimaryLight,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacing3),
-          Builder(
-            builder: (context) {
-              // Debug: afficher l'état actuel
-              if (_isLoading) {
-                print('🔄 Affichage du loader (isLoading: $_isLoading, types: ${_documentTypes.length})');
-                return const SizedBox(
-                  height: 50,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              
-              if (_documentTypes.isEmpty) {
-                print('📋 Aucun type de document (isLoading: $_isLoading, types: ${_documentTypes.length})');
-                return Container(
-                  padding: const EdgeInsets.all(AppSpacing.spacing4),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.warning, size: 20),
-                      const SizedBox(width: AppSpacing.spacing2),
-                      Expanded(
-                        child: Text(
-                          'Aucun type de document disponible',
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.warning,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              
-              // S'assurer que la valeur sélectionnée existe dans la liste
-              final validValue = _selectedDocumentTypeId != null &&
-                  _documentTypes.any((doc) => doc['id'] == _selectedDocumentTypeId)
-                  ? _selectedDocumentTypeId
-                  : (_documentTypes.isNotEmpty ? _documentTypes.first['id'] as String : null);
-              
-              print('📋 Affichage dropdown (isLoading: $_isLoading, types: ${_documentTypes.length}, validValue: $validValue)');
-              
-              return DropdownButtonFormField<String>(
-                key: ValueKey('doc_type_${_documentTypes.length}_$validValue'),
-                value: validValue,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    borderSide: BorderSide(color: AppColors.gray300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    borderSide: BorderSide(color: AppColors.gray300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    borderSide: BorderSide(color: AppColors.primary),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.spacing3,
-                    vertical: AppSpacing.spacing3,
-                  ),
-                  filled: true,
-                  fillColor: AppColors.gray50,
-                ),
-                items: _documentTypes
-                    .where((type) {
-                      final id = type['id'];
-                      return id != null && id.toString().isNotEmpty;
-                    })
-                    .map((type) {
-                      final id = type['id'] as String;
-                      final name = type['display_name'] as String? ?? 
-                                  type['name'] as String? ?? 'Document';
-                      
-                      return DropdownMenuItem<String>(
-                        value: id,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getDocumentTypeIconForName(name),
-                              size: 20,
-                              color: AppColors.gray600,
-                            ),
-                            const SizedBox(width: AppSpacing.spacing2),
-                            Expanded(
-                              child: Text(
-                                name,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                onChanged: (value) {
-                  if (value == null) return;
-                  
-                  setState(() {
-                    _selectedDocumentTypeId = value;
-                    try {
-                      final selectedType = _documentTypes.firstWhere(
-                        (type) => type['id'] == value,
-                      );
-                      _selectedDocumentTypeName = selectedType['display_name'] as String? ?? 
-                                                  selectedType['name'] as String? ?? 'Document';
-                    } catch (e) {
-                      print('⚠️ Erreur lors de la sélection du type: $e');
-                      _selectedDocumentTypeName = 'Document';
-                    }
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Veuillez sélectionner un type de document';
-                  }
-                  return null;
-                },
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Section informations du document
   Widget _buildDocumentInfoSection() {
@@ -1209,29 +934,32 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     
     setState(() {
       _isUploading = true;
-      _errorMessage = null;
     });
     
-    // Afficher un dialog de chargement
+    // Afficher un dialog de chargement et stocker son contexte
+    BuildContext? dialogContext;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(height: AppSpacing.spacing4),
-              Text(
-                'Upload du document en cours...',
-                style: AppTypography.bodyMedium,
-              ),
-            ],
+      builder: (dialogBuildContext) {
+        dialogContext = dialogBuildContext;
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: AppSpacing.spacing4),
+                Text(
+                  'Upload du document en cours...',
+                  style: AppTypography.bodyMedium,
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     
     try {
@@ -1244,18 +972,26 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         expiryDate: _expiryDate,
       );
       
-      // Émettre un événement pour déclencher le rafraîchissement
-      AppEventService.instance.emit(AppEventType.documentUploaded);
-      
-      // Rafraîchir la liste des documents
+      // Fermer le dialog de chargement AVANT les opérations asynchrones
+      // Utiliser rootNavigator pour s'assurer de fermer le dialog
       if (mounted) {
-        final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
-        documentProvider.loadDocuments();
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (e) {
+          // Si la fermeture échoue, essayer avec le contexte du dialog
+          try {
+            if (dialogContext != null) {
+              Navigator.of(dialogContext!, rootNavigator: true).pop();
+            }
+          } catch (e2) {
+            // Ignorer si le dialog n'existe plus
+            debugPrint('Erreur lors de la fermeture du dialog: $e2');
+          }
+        }
       }
       
+      // Rafraîchir directement les documents après upload (sans événement)
       if (mounted) {
-        Navigator.pop(context); // Fermer le dialog de chargement
-        
         setState(() {
           _isUploading = false;
         });
@@ -1279,8 +1015,14 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         );
       }
     } catch (e) {
+      // Fermer le dialog de chargement en cas d'erreur
       if (mounted) {
-        Navigator.pop(context); // Fermer le dialog de chargement
+        // Essayer de fermer le dialog s'il existe encore
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {
+          // Le dialog n'existe peut-être plus, ignorer l'erreur
+        }
         
         setState(() {
           _isUploading = false;
@@ -1304,5 +1046,472 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         );
       }
     }
+  }
+}
+
+/// Widget séparé pour le sélecteur de type de document
+/// Utilise une liste statique de types avec mapping vers les IDs réels de l'API
+class _DocumentTypeSelector extends StatefulWidget {
+  final DocumentService documentService;
+  final String? selectedTypeId;
+  final Function(String typeId, String typeName) onTypeSelected;
+
+  const _DocumentTypeSelector({
+    required this.documentService,
+    required this.selectedTypeId,
+    required this.onTypeSelected,
+  });
+
+  @override
+  State<_DocumentTypeSelector> createState() => _DocumentTypeSelectorState();
+}
+
+class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
+  /// Liste statique des types de documents (noms pour l'affichage)
+  static const List<_StaticDocumentType> _staticDocumentTypes = [
+    _StaticDocumentType(
+      name: 'id_card',
+      displayName: 'Carte d\'Identité',
+      description: 'Carte nationale d\'identité',
+    ),
+    _StaticDocumentType(
+      name: 'passport',
+      displayName: 'Passeport',
+      description: 'Passeport',
+    ),
+    _StaticDocumentType(
+      name: 'proof_of_address',
+      displayName: 'Justificatif de Domicile',
+      description: 'Justificatif de domicile',
+    ),
+    _StaticDocumentType(
+      name: 'salary_slip',
+      displayName: 'Bulletin de Salaire',
+      description: 'Bulletin de salaire',
+    ),
+    _StaticDocumentType(
+      name: 'driving_license',
+      displayName: 'Permis de Conduire',
+      description: 'Permis de conduire',
+    ),
+    _StaticDocumentType(
+      name: 'birth_certificate',
+      displayName: 'Acte de Naissance',
+      description: 'Acte de naissance',
+    ),
+  ];
+
+  late final Future<Map<String, String>> _typeIdMappingFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Charger le mapping des IDs une seule fois
+    _typeIdMappingFuture = _loadTypeIdMapping();
+  }
+
+  /// Charger les IDs réels depuis l'API et les mapper avec les noms statiques
+  Future<Map<String, String>> _loadTypeIdMapping() async {
+    try {
+      final rawDocs = await widget.documentService.getRequiredDocuments();
+      
+      final mapping = <String, String>{};
+      
+      for (final doc in rawDocs) {
+        try {
+          final id = doc['id']?.toString();
+          final name = doc['name']?.toString();
+          
+          if (id != null && name != null && id.isNotEmpty && name.isNotEmpty) {
+            mapping[name] = id;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      return mapping;
+    } catch (e) {
+      // En cas d'erreur, retourner un mapping vide
+      // Les types statiques seront utilisés avec leurs noms comme fallback
+      return {};
+    }
+  }
+
+  /// Obtenir la liste des types de documents avec leurs IDs réels
+  Future<List<_DocumentType>> _getDocumentTypes() async {
+    final mapping = await _typeIdMappingFuture;
+    
+    return _staticDocumentTypes.map((staticType) {
+      // Utiliser l'ID réel de l'API si disponible, sinon utiliser le nom comme fallback
+      final realId = mapping[staticType.name] ?? staticType.name;
+      
+      return _DocumentType(
+        id: realId,
+        name: staticType.name,
+        displayName: staticType.displayName,
+        description: staticType.description ?? '',
+      );
+    }).toList();
+  }
+
+  IconData _getDocumentTypeIcon(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('carte') || lowerName.contains('identité')) {
+      return Icons.badge_outlined;
+    } else if (lowerName.contains('passeport')) {
+      return Icons.airplane_ticket_outlined;
+    } else if (lowerName.contains('domicile') || lowerName.contains('adresse')) {
+      return Icons.home_outlined;
+    } else if (lowerName.contains('salaire') || lowerName.contains('bulletin')) {
+      return Icons.receipt_outlined;
+    } else if (lowerName.contains('permis')) {
+      return Icons.drive_eta_outlined;
+    }
+    return Icons.description_outlined;
+  }
+
+  /// Afficher le bottom sheet pour sélectionner le type de document
+  void _showDocumentTypeSheet(
+    BuildContext context,
+    List<_DocumentType> documentTypes,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _DocumentTypeSheet(
+        documentTypes: documentTypes,
+        selectedTypeId: widget.selectedTypeId,
+        onTypeSelected: (typeId, typeName) {
+          widget.onTypeSelected(typeId, typeName);
+          Navigator.pop(context);
+        },
+        getDocumentTypeIcon: _getDocumentTypeIcon,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
+      padding: const EdgeInsets.all(AppSpacing.spacing4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.category,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: AppSpacing.spacing2),
+              Text(
+                'Type de document',
+                style: AppTypography.bodyLarge.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.spacing3),
+          FutureBuilder<List<_DocumentType>>(
+            future: _getDocumentTypes(),
+            builder: (context, snapshot) {
+              // État de chargement
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 50,
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+
+              // Erreur ou liste vide
+              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(AppSpacing.spacing4),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: AppColors.warning,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.spacing2),
+                      Expanded(
+                        child: Text(
+                          'Erreur lors du chargement des types',
+                          style: AppTypography.bodySmall.copyWith(
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Données chargées avec succès
+              final documentTypes = snapshot.data!;
+              
+              // Trouver le type sélectionné
+              final selectedType = widget.selectedTypeId != null
+                  ? documentTypes.firstWhere(
+                      (type) => type.id == widget.selectedTypeId,
+                      orElse: () => documentTypes.first,
+                    )
+                  : documentTypes.first;
+
+              return InkWell(
+                onTap: () => _showDocumentTypeSheet(context, documentTypes),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.spacing3,
+                    vertical: AppSpacing.spacing3,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.gray300),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    color: AppColors.gray50,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getDocumentTypeIcon(selectedType.displayName),
+                        size: 20,
+                        color: AppColors.gray600,
+                      ),
+                      const SizedBox(width: AppSpacing.spacing2),
+                      Expanded(
+                        child: Text(
+                          selectedType.displayName,
+                          style: AppTypography.bodyMedium,
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: AppColors.gray600,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Modèle de données pour un type de document (avec ID réel de l'API)
+class _DocumentType {
+  final String id;
+  final String name;
+  final String displayName;
+  final String? description;
+
+  const _DocumentType({
+    required this.id,
+    required this.name,
+    required this.displayName,
+    this.description,
+  });
+}
+
+/// Modèle statique pour les types de documents (sans ID réel)
+class _StaticDocumentType {
+  final String name;
+  final String displayName;
+  final String? description;
+
+  const _StaticDocumentType({
+    required this.name,
+    required this.displayName,
+    this.description,
+  });
+}
+
+/// Bottom sheet pour sélectionner le type de document
+class _DocumentTypeSheet extends StatelessWidget {
+  final List<_DocumentType> documentTypes;
+  final String? selectedTypeId;
+  final Function(String typeId, String typeName) onTypeSelected;
+  final IconData Function(String name) getDocumentTypeIcon;
+
+  const _DocumentTypeSheet({
+    required this.documentTypes,
+    required this.selectedTypeId,
+    required this.onTypeSelected,
+    required this.getDocumentTypeIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppSpacing.radiusXl),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle bar
+            Container(
+              margin: const EdgeInsets.only(top: AppSpacing.spacing3),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            
+            // Title
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.spacing4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.category,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: AppSpacing.spacing2),
+                  Text(
+                    'Type de document',
+                    style: AppTypography.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const Divider(height: 1),
+            
+            // Liste des types
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(AppSpacing.spacing2),
+                itemCount: documentTypes.length,
+                separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.spacing1),
+                itemBuilder: (context, index) {
+                  final type = documentTypes[index];
+                  final isSelected = type.id == selectedTypeId;
+                  
+                  return InkWell(
+                    onTap: () => onTypeSelected(type.id, type.displayName),
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.spacing3),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.transparent,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.spacing2),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.gray100,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                            ),
+                            child: Icon(
+                              getDocumentTypeIcon(type.displayName),
+                              size: 20,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.gray600,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.spacing3),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  type.displayName,
+                                  style: AppTypography.bodyMedium.copyWith(
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                                if (type.description != null && type.description!.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    type.description!,
+                                    style: AppTypography.bodySmall.copyWith(
+                                      color: AppColors.textSecondaryLight,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_circle,
+                              color: AppColors.primary,
+                              size: 24,
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            const SizedBox(height: AppSpacing.spacing2),
+          ],
+        ),
+      ),
+    );
   }
 }

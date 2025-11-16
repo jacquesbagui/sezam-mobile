@@ -12,7 +12,6 @@ import '../../core/utils/kyc_redirection.dart';
 import 'widgets/phone_input_field.dart';
 import 'widgets/input_type_segmented_control.dart';
 import 'widgets/password_strength_indicator.dart';
-import 'widgets/otp_verification_dialog.dart';
 
 /// Écran d'authentification de l'application SEZAM
 class AuthScreen extends StatefulWidget {
@@ -22,7 +21,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -38,7 +37,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   final _confirmPasswordFocusNode = FocusNode();
 
   late AnimationController _animationController;
+  late AnimationController _slideAnimationController;
   late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
 
   bool _isLogin = true;
   bool _isEmail = true;
@@ -53,14 +54,26 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _slideAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOut,
     );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideAnimationController,
+      curve: Curves.easeOutCubic,
+    ));
     _animationController.forward();
+    _slideAnimationController.forward();
 
     // Listen to password changes for strength indicator
     _passwordController.addListener(() {
@@ -76,6 +89,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   @override
   void dispose() {
     _animationController.dispose();
+    _slideAnimationController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -92,12 +106,16 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   void _toggleAuthMode() {
+    HapticFeedback.selectionClick();
     setState(() {
       _isLogin = !_isLogin;
       _errorMessage = null;
-      _animationController.reset();
-      _animationController.forward();
     });
+    // Animate transition
+    _slideAnimationController.reset();
+    _slideAnimationController.forward();
+    _animationController.reset();
+    _animationController.forward();
     // Move focus to the appropriate first field
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusInitialField());
   }
@@ -185,6 +203,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       return;
     }
 
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -208,8 +227,10 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         });
         
         if (!success && authProvider.requiresOtp) {
-          // Afficher le dialogue OTP
-          _showOtpDialog(authProvider);
+          // Rediriger vers l'écran OTP pour le login
+          if (mounted) {
+            context.go('/otp-verification?email=${Uri.encodeComponent(_emailController.text.trim())}');
+          }
         } else if (authProvider.errorMessage != null) {
           setState(() {
             _errorMessage = authProvider.errorMessage;
@@ -240,11 +261,18 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           HapticFeedback.lightImpact();
         } else {
           HapticFeedback.mediumImpact();
-          // Après inscription: OTP requis avant accès
-          _showOtpDialog(authProvider);
           setState(() {
             _isLoading = false;
           });
+          // Après inscription: rediriger vers l'écran OTP
+          if (mounted) {
+            final otpCode = authProvider.otpCode;
+            final email = _emailController.text.trim();
+            final uri = otpCode != null
+                ? '/otp-verification?email=${Uri.encodeComponent(email)}&otp_code=${Uri.encodeComponent(otpCode)}'
+                : '/otp-verification?email=${Uri.encodeComponent(email)}';
+            context.go(uri);
+          }
         }
       }
     } catch (e) {
@@ -258,42 +286,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
-  void _showOtpDialog(AuthProvider authProvider) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => OtpVerificationDialog(
-        email: authProvider.otpEmail ?? '',
-        onResend: () async {
-          await authProvider.resendOtp();
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Code renvoyé avec succès'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        },
-        onSubmit: (code) async {
-          //await authProvider.verifyOtp(code);
-          if (!mounted) return;
-
-          if (authProvider.errorMessage != null) {
-            setState(() => _errorMessage = authProvider.errorMessage);
-            HapticFeedback.lightImpact();
-            Navigator.of(context).pop();
-          } else {
-            Navigator.of(context).pop();
-            HapticFeedback.mediumImpact();
-            // Après inscription et vérification OTP, rediriger vers onboarding
-            // L'onboarding redirigera ensuite vers KYC
-            context.go('/onboarding');
-          }
-        },
-      ),
-    );
-  }
 
   Future<void> _handleBiometricAuth() async {
     HapticFeedback.selectionClick();
@@ -337,11 +329,13 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             padding: const EdgeInsets.all(AppSpacing.spacing6),
             child: FadeTransition(
               opacity: _fadeAnimation,
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     const SizedBox(height: AppSpacing.spacing8),
 
                     // Logo et titre
@@ -614,8 +608,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                               controller: _confirmPasswordController,
                               focusNode: _confirmPasswordFocusNode,
                               obscureText: _obscureConfirmPassword,
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => _handleAuth(),
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) {
+                                // Ne pas soumettre, laisser l'utilisateur voir les autres champs
+                                FocusScope.of(context).unfocus();
+                              },
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
@@ -718,6 +715,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           ),
         ),
       ),
+    ),
     );
   }
 }

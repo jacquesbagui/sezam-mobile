@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -26,30 +27,42 @@ class SezamButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      height: size == SezamButtonSize.large ? 48 : null,
-      child: variant == SezamButtonVariant.outline || variant == SezamButtonVariant.gray || variant == SezamButtonVariant.grayOutline
-          ? OutlinedButton(
-              onPressed: isLoading ? null : onPressed,
-              style: variant == SezamButtonVariant.outline 
-                  ? _getOutlinedButtonStyle(theme)
-                  : variant == SezamButtonVariant.gray
-                      ? _getGrayButtonStyle(theme)
-                      : _getGrayOutlineButtonStyle(theme),
-              child: _buildButtonContent(),
-            )
-          : ElevatedButton(
-              onPressed: isLoading ? null : onPressed,
-              style: _getButtonStyle(theme),
-              child: _buildButtonContent(),
-            ),
+    return RepaintBoundary(
+      child: SizedBox(
+        width: isFullWidth ? double.infinity : null,
+        height: size == SezamButtonSize.large ? 48 : null,
+        child: variant == SezamButtonVariant.outline || variant == SezamButtonVariant.gray || variant == SezamButtonVariant.grayOutline
+            ? OutlinedButton(
+                onPressed: isLoading ? null : () {
+                  // Feedback haptique pour meilleure réactivité
+                  if (onPressed != null) {
+                    HapticFeedback.selectionClick();
+                    onPressed!();
+                  }
+                },
+                style: variant == SezamButtonVariant.outline 
+                    ? _getOutlinedButtonStyle(context)
+                    : variant == SezamButtonVariant.gray
+                        ? _getGrayButtonStyle(context)
+                        : _getGrayOutlineButtonStyle(context),
+                child: _buildButtonContent(),
+              )
+            : ElevatedButton(
+                onPressed: isLoading ? null : () {
+                  // Feedback haptique pour meilleure réactivité
+                  if (onPressed != null) {
+                    HapticFeedback.selectionClick();
+                    onPressed!();
+                  }
+                },
+                style: _getButtonStyle(context),
+                child: _buildButtonContent(),
+              ),
+      ),
     );
   }
 
-  ButtonStyle _getButtonStyle(ThemeData theme) {
+  ButtonStyle _getButtonStyle(BuildContext context) {
     Color backgroundColor;
     Color foregroundColor;
     Color? borderColor;
@@ -127,7 +140,7 @@ class SezamButton extends StatelessWidget {
     );
   }
 
-  ButtonStyle _getOutlinedButtonStyle(ThemeData theme) {
+  ButtonStyle _getOutlinedButtonStyle(BuildContext context) {
     EdgeInsets padding;
     double fontSize;
 
@@ -166,7 +179,7 @@ class SezamButton extends StatelessWidget {
     );
   }
 
-  ButtonStyle _getGrayButtonStyle(ThemeData theme) {
+  ButtonStyle _getGrayButtonStyle(BuildContext context) {
     EdgeInsets padding;
     double fontSize;
 
@@ -206,7 +219,7 @@ class SezamButton extends StatelessWidget {
     );
   }
 
-  ButtonStyle _getGrayOutlineButtonStyle(ThemeData theme) {
+  ButtonStyle _getGrayOutlineButtonStyle(BuildContext context) {
     EdgeInsets padding;
     double fontSize;
 

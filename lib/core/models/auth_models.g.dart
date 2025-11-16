@@ -37,12 +37,17 @@ Map<String, dynamic> _$RegisterRequestToJson(RegisterRequest instance) =>
 
 VerifyOtpRequest _$VerifyOtpRequestFromJson(Map<String, dynamic> json) =>
     VerifyOtpRequest(
-      email: json['email'] as String,
+      identifier: json['identifier'] as String,
+      otpType: json['otp_type'] as String,
       code: json['code'] as String,
     );
 
 Map<String, dynamic> _$VerifyOtpRequestToJson(VerifyOtpRequest instance) =>
-    <String, dynamic>{'email': instance.email, 'code': instance.code};
+    <String, dynamic>{
+      'identifier': instance.identifier,
+      'otp_type': instance.otpType,
+      'code': instance.code,
+    };
 
 AuthResponse _$AuthResponseFromJson(Map<String, dynamic> json) => AuthResponse(
   message: json['message'] as String,

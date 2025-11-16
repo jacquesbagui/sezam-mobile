@@ -16,17 +16,48 @@ class PersonalInfoKycScreen extends StatefulWidget {
 }
 
 class _PersonalInfoKycScreenState extends State<PersonalInfoKycScreen> {
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().loadProfileStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) {
+        try {
+          await context.read<ProfileProvider>().loadProfileStatus();
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        } catch (e) {
+          print('❌ Erreur lors du chargement du profil: $e');
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.gray50,
+        appBar: AppBar(
+          title: const Text('Informations personnelles'),
+          elevation: 0,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     
     return Scaffold(
       backgroundColor: AppColors.gray50,
@@ -88,12 +119,17 @@ class _PersonalInfoKycScreenState extends State<PersonalInfoKycScreen> {
             SizedBox(height: AppSpacing.spacing4),
 
             // Liste des champs à compléter
-            _buildInfoItem(
-              icon: Icons.badge_outlined,
-              label: 'Nom et prénom',
-              value: authProvider.currentUser?.fullName ?? 'Non renseigné',
-              fieldType: 'fullName',
-              color: _getFieldColor(authProvider.currentUser?.fullName),
+            Builder(
+              builder: (context) {
+                final fullName = authProvider.currentUser?.fullName;
+                return _buildInfoItem(
+                  icon: Icons.badge_outlined,
+                  label: 'Nom et prénom',
+                  value: (fullName?.isNotEmpty ?? false) ? fullName! : 'Non renseigné',
+                  fieldType: 'fullName',
+                  color: _getFieldColor(fullName),
+                );
+              },
             ),
 
             SizedBox(height: AppSpacing.spacing2),
@@ -138,12 +174,17 @@ class _PersonalInfoKycScreenState extends State<PersonalInfoKycScreen> {
 
             SizedBox(height: AppSpacing.spacing2),
 
-            _buildInfoItem(
-              icon: Icons.phone_outlined,
-              label: 'Téléphone',
-              value: authProvider.currentUser?.phone ?? 'Non renseigné',
-              fieldType: 'phone',
-              color: _getFieldColor(authProvider.currentUser?.phone),
+            Builder(
+              builder: (context) {
+                final phone = authProvider.currentUser?.phone;
+                return _buildInfoItem(
+                  icon: Icons.phone_outlined,
+                  label: 'Téléphone',
+                  value: (phone?.isNotEmpty ?? false) ? phone! : 'Non renseigné',
+                  fieldType: 'phone',
+                  color: _getFieldColor(phone),
+                );
+              },
             ),
           ],
         ),
