@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
@@ -49,8 +50,11 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
+            // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /dashboard
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
+            } else {
+              context.go('/dashboard');
             }
           },
         ),
@@ -134,6 +138,12 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                      c.revokedAt == null &&
                      !c.statusName.toLowerCase().contains('revocation');
             }).toList();
+            // Trier par grantedAt décroissant (plus récentes en premier)
+            consents.sort((a, b) {
+              final dateA = a.grantedAt ?? a.createdAt;
+              final dateB = b.grantedAt ?? b.createdAt;
+              return dateB.compareTo(dateA);
+            });
             break;
           case 1:
             // Consents expirés
@@ -144,13 +154,38 @@ class _ConnectionsScreenState extends State<ConnectionsScreen> {
                      c.revokedAt == null &&
                      !c.statusName.toLowerCase().contains('revocation');
             }).toList();
+            // Trier par expiresAt décroissant (plus récentes en premier)
+            consents.sort((a, b) {
+              final dateA = a.expiresAt ?? a.createdAt;
+              final dateB = b.expiresAt ?? b.createdAt;
+              return dateB.compareTo(dateA);
+            });
             break;
           case 2:
             // Consents révoqués ou en attente de révocation
             consents = allConsents.where((c) {
-              return c.revokedAt != null || 
-                     c.statusName.toLowerCase().contains('revocation');
+              final statusLower = c.statusName.toLowerCase();
+              final isRevoked = c.revokedAt != null || 
+                                statusLower.contains('revocation') ||
+                                statusLower == 'revoked';
+              
+              // Debug: log pour voir ce qui se passe
+              if (c.revokedAt != null || statusLower.contains('revok')) {
+                print('🔍 Connexion révoquée trouvée: ${c.id}, revokedAt: ${c.revokedAt}, status: ${c.statusName}');
+              }
+              
+              return isRevoked;
             }).toList();
+            
+            // Trier par revokedAt décroissant (plus récentes en premier)
+            consents.sort((a, b) {
+              final dateA = a.revokedAt ?? a.createdAt;
+              final dateB = b.revokedAt ?? b.createdAt;
+              return dateB.compareTo(dateA);
+            });
+            
+            // Debug: log le nombre de connexions révoquées trouvées
+            print('📊 Connexions révoquées trouvées: ${consents.length} sur ${allConsents.length} total');
             break;
           default:
             consents = [];

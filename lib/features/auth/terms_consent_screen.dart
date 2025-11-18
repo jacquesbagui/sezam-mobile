@@ -57,7 +57,6 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
         content: const SingleChildScrollView(
           child: Text(
             'Les conditions d\'utilisation seront affichées ici. '
-            'Vous pouvez intégrer un WebView ou un document PDF.',
           ),
         ),
         actions: [
@@ -79,7 +78,6 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
         content: const SingleChildScrollView(
           child: Text(
             'La politique de confidentialité sera affichée ici. '
-            'Vous pouvez intégrer un WebView ou un document PDF.',
           ),
         ),
         actions: [
@@ -132,21 +130,11 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withValues(alpha: 0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                ),
-                child: const Icon(
-                  Icons.security,
-                  size: 40,
-                  color: Colors.white,
+                child: Image.asset(
+                  'assets/logo/app_icon.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.contain,
                 ),
               ),
               

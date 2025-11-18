@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -344,18 +345,11 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         children: [
                           Hero(
                             tag: 'app_logo',
-                            child: Container(
+                            child: Image.asset(
+                              'assets/logo/app_icon.png',
                               width: 80,
                               height: 80,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                              ),
-                              child: Icon(
-                                Icons.security,
-                                size: 40,
-                                color: AppColors.primary,
-                              ),
+                              fit: BoxFit.contain,
                             ),
                           ),
                           const SizedBox(height: AppSpacing.spacing4),
@@ -674,8 +668,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
                     const SizedBox(height: AppSpacing.spacing4),
 
-                    // Bouton biométrique
-                    if (_isLogin) ...[
+                    // Bouton biométrique (désactivé sur Android)
+                    if (_isLogin && !Platform.isAndroid) ...[
                       SezamButton(
                         text: 'Connexion biométrique',
                         variant: SezamButtonVariant.grayOutline,

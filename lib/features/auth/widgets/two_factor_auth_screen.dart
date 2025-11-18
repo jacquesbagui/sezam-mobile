@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
@@ -238,10 +239,11 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                                   ),
                                 ],
                               ),
-                              child: Icon(
-                                Icons.security,
-                                size: 50,
-                                color: AppColors.primary,
+                              child: Image.asset(
+                                'assets/logo/app_icon.png',
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: AppSpacing.spacing6),
@@ -613,14 +615,17 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
 
                       const SizedBox(height: AppSpacing.spacing4),
 
-                      // Bouton d'authentification biométrique
-                      SezamButton(
-                        text: 'Authentification biométrique',
-                        variant: SezamButtonVariant.grayOutline,
-                        icon: const Icon(Icons.fingerprint),
-                        onPressed: _isLoading ? null : _handleBiometricAuth,
-                        isFullWidth: true,
-                      ),
+                      // Bouton d'authentification biométrique (désactivé sur Android)
+                      if (!Platform.isAndroid) ...[
+                        SezamButton(
+                          text: 'Authentification biométrique',
+                          variant: SezamButtonVariant.grayOutline,
+                          icon: const Icon(Icons.fingerprint),
+                          onPressed: _isLoading ? null : _handleBiometricAuth,
+                          isFullWidth: true,
+                        ),
+                        const SizedBox(height: AppSpacing.spacing4),
+                      ],
 
                       const SizedBox(height: AppSpacing.spacing6),
 

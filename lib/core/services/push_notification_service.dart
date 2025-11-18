@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
 import '../services/consent_service.dart';
 import '../../features/requests/request_detail_screen.dart';
+import '../../features/connections/connection_detail_screen.dart';
 import 'app_event_service.dart';
 
 /// Service pour gérer les notifications push via Firebase Cloud Messaging
@@ -433,6 +434,30 @@ class PushNotificationService {
     }
   }
 
+  /// Liste des routes valides dans l'application
+  static const Set<String> _validRoutes = {
+    '/splash',
+    '/onboarding',
+    '/auth',
+    '/otp-verification',
+    '/registration-success',
+    '/dashboard',
+    '/documents',
+    '/requests',
+    '/connections',
+    '/profile',
+    '/kyc',
+    '/usage-purpose',
+    '/terms-consent',
+  };
+
+  /// Vérifier si une route est valide
+  bool _isValidRoute(String route) {
+    // Normaliser la route (enlever les query parameters)
+    final normalizedRoute = route.split('?').first;
+    return _validRoutes.contains(normalizedRoute);
+  }
+
   /// Effectuer la navigation selon le type de notification
   void _performNavigation(
     BuildContext ctx,
@@ -446,14 +471,30 @@ class PushNotificationService {
     }
 
     try {
-      // Priorité 1: Utiliser le screen fourni par le backend
-      if (screen != null && screen.isNotEmpty) {
-        print('📍 Navigation vers: $screen');
-        _safePush(ctx, screen);
+      // Priorité 1: Si un consentId est fourni pour les types de consentement, naviguer vers le détail
+      if (consentId != null && 
+          (type == 'consent_granted' || type == 'consent_denied' || type == 'consent_revoked' || type == 'consent_request')) {
+        print('📍 Navigation vers détail (consentId fourni): $consentId');
+        _navigateToConsent(consentId);
         return;
       }
 
-      // Priorité 2: Navigation selon le type
+      // Priorité 2: Utiliser le screen fourni par le backend (seulement si valide)
+      if (screen != null && screen.isNotEmpty) {
+        // Normaliser la route
+        final normalizedScreen = screen.startsWith('/') ? screen : '/$screen';
+        
+        if (_isValidRoute(normalizedScreen)) {
+          print('📍 Navigation vers: $normalizedScreen');
+          _safePush(ctx, normalizedScreen);
+          return;
+        } else {
+          print('⚠️ Route invalide fournie par le backend: $screen, utilisation du type de notification');
+          // Continuer avec la logique basée sur le type
+        }
+      }
+
+      // Priorité 3: Navigation selon le type
       switch (type) {
         case 'profile_validated':
           print('📍 Navigation vers profil');
@@ -461,19 +502,16 @@ class PushNotificationService {
           break;
 
         case 'consent_request':
-          if (consentId != null) {
-            print('📍 Navigation vers consent: $consentId');
-            _navigateToConsent(consentId);
-          } else {
-            print('📍 Navigation vers requests');
-            _safePush(ctx, '/requests');
-          }
+          print('📍 Navigation vers requests');
+          _safePush(ctx, '/requests');
           break;
 
         case 'consent_granted':
         case 'consent_denied':
-          print('📍 Navigation vers requests');
-          _safePush(ctx, '/requests');
+        case 'consent_revoked':
+          // Naviguer vers la liste des connexions
+          print('📍 Navigation vers connections');
+          _safePush(ctx, '/connections');
           break;
 
         case 'document_verified':
@@ -525,6 +563,7 @@ class PushNotificationService {
       'consent_request': AppEventType.consentRequested,
       'consent_granted': AppEventType.consentGranted,
       'consent_denied': AppEventType.consentDenied,
+      'consent_revoked': AppEventType.consentRevoked,
       'document_verified': AppEventType.documentVerified,
       'document_rejected': AppEventType.documentRejected,
       'document_uploaded': AppEventType.documentUploaded,
@@ -552,12 +591,20 @@ class PushNotificationService {
     try {
       print('🔍 Chargement du consentement: $consentId');
       
+      // Attendre un peu pour s'assurer que l'app est prête
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (!ctx.mounted) {
+        print('⚠️ Widget non monté après délai');
+        return;
+      }
+      
       // Charger le consentement depuis l'API
       final consent = await ConsentService().getConsentById(consentId);
       
       if (consent == null) {
-        print('⚠️ Consentement introuvable, redirection vers /requests');
-        _safePush(ctx, '/requests');
+        print('⚠️ Consentement introuvable (ID: $consentId), redirection vers /connections');
+        _safePush(ctx, '/connections');
         return;
       }
 
@@ -566,20 +613,40 @@ class PushNotificationService {
         return;
       }
 
-      // Naviguer vers le détail du consentement
-      await Navigator.of(ctx).push(
-        MaterialPageRoute(
-          builder: (_) => RequestDetailScreen(
-            consent: consent,
-            currentTabIndex: 0,
+      print('✅ Consentement chargé: ${consent.id}, status: ${consent.statusName}, granted: ${consent.isGranted}');
+
+      // Naviguer vers le détail de la connexion
+      // Utiliser ConnectionDetailScreen pour les connexions (consent_granted, consent_denied, consent_revoked)
+      // et RequestDetailScreen pour les demandes en attente (consent_request)
+      final isConnection = consent.isGranted || consent.revokedAt != null || consent.deniedAt != null;
+      
+      if (isConnection) {
+        print('📍 Navigation vers ConnectionDetailScreen');
+        // Pour les connexions, utiliser ConnectionDetailScreen
+        await Navigator.of(ctx).push(
+          MaterialPageRoute(
+            builder: (_) => ConnectionDetailScreen(consent: consent),
           ),
-        ),
-      );
-    } catch (e) {
+        );
+      } else {
+        print('📍 Navigation vers RequestDetailScreen');
+        // Pour les demandes en attente, utiliser RequestDetailScreen
+        await Navigator.of(ctx).push(
+          MaterialPageRoute(
+            builder: (_) => RequestDetailScreen(
+              consent: consent,
+              currentTabIndex: 0,
+            ),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
       print('❌ Erreur de navigation vers le consentement: $e');
-      // Fallback: ouvrir la liste des demandes
+      print('Stack trace: $stackTrace');
+      // Fallback: ouvrir la liste des connexions
       if (ctx.mounted) {
-        _safePush(ctx, '/requests');
+        print('📍 Fallback: navigation vers /connections');
+        _safePush(ctx, '/connections');
       }
     }
   }

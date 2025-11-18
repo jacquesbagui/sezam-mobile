@@ -11,6 +11,7 @@ import '../../features/profile/profile_screen.dart';
 import '../../features/kyc/kyc_screen.dart';
 import '../../features/requests/requests_screen.dart' as requests_feature;
 import '../../features/documents/documents_screen.dart' as documents_feature;
+import '../../features/connections/connections_screen.dart' as connections_feature;
 import '../../features/auth/usage_purpose_screen.dart';
 import '../../features/auth/terms_consent_screen.dart';
 import '../../core/providers/auth_provider.dart';
@@ -105,6 +106,20 @@ class AppRouter {
         path: '/requests',
         name: 'requests',
         builder: (context, state) => const requests_feature.RequestsScreen(),
+      ),
+      
+      // Connections - Protected route
+      GoRoute(
+        path: '/connections',
+        name: 'connections',
+        redirect: (context, state) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          return null;
+        },
+        builder: (context, state) => const connections_feature.ConnectionsScreen(),
       ),
       
       // Profile - Protected route

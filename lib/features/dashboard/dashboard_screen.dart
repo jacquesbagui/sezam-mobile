@@ -80,6 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onShowConnections: _showConnectionsInfo,
           onShowAlerts: _showAlertsInfo,
           onNavigateToNotifications: () => setState(() => _currentIndex = 3),
+          onNavigateToPartners: () => context.go('/partners'),
         );
       case 1:
         return DocumentsScreen(onBackToDashboard: () => setState(() => _currentIndex = 0));
@@ -96,6 +97,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onShowConnections: _showConnectionsInfo,
           onShowAlerts: _showAlertsInfo,
           onNavigateToNotifications: () => setState(() => _currentIndex = 3),
+          onNavigateToPartners: () => context.go('/partners'),
         );
     }
   }
@@ -208,6 +210,7 @@ class DashboardHomeScreen extends StatefulWidget {
   final VoidCallback onShowConnections;
   final VoidCallback onShowAlerts;
   final VoidCallback onNavigateToNotifications;
+  final VoidCallback onNavigateToPartners;
   
   const DashboardHomeScreen({
     super.key,
@@ -216,6 +219,7 @@ class DashboardHomeScreen extends StatefulWidget {
     required this.onShowConnections,
     required this.onShowAlerts,
     required this.onNavigateToNotifications,
+    required this.onNavigateToPartners,
   });
 
   @override
@@ -1074,24 +1078,32 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                       label: 'Mes connexions',
                       onTap: widget.onShowConnections,
                     ),
+                    const SizedBox(height: AppSpacing.spacing3),
+                    _buildActionCard(
+                      icon: Icons.business_outlined,
+                      iconColor: const Color(0xFF6366F1), // Indigo
+                      iconBgColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      label: 'Partenaires',
+                      onTap: widget.onNavigateToPartners,
+                    ),
                   ],
                 );
               }
               
-              // Pour les grands écrans, utiliser une grille à 3 colonnes
+              // Pour les écrans moyens et grands, utiliser une grille à 2 colonnes
               return GridView.count(
                 padding: EdgeInsets.zero,
-                crossAxisCount: 3,
+                crossAxisCount: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: AppSpacing.spacing3,
-                crossAxisSpacing: AppSpacing.spacing3,
-                childAspectRatio: 1.1,
+                mainAxisSpacing: AppSpacing.spacing2,
+                crossAxisSpacing: AppSpacing.spacing2,
+                childAspectRatio: 1.5,
                 children: [
                   _buildActionCard(
                     icon: Icons.upload_file_outlined,
                     iconColor: AppColors.primary,
-                      iconBgColor: AppColors.primary.withValues(alpha: 0.1),
+                    iconBgColor: AppColors.primary.withValues(alpha: 0.1),
                     label: 'Ajouter un\ndocument',
                     onTap: widget.onNavigateToDocuments,
                   ),
@@ -1112,8 +1124,15 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                     icon: Icons.account_tree_outlined,
                     iconColor: AppColors.secondary,
                     iconBgColor: AppColors.secondary.withValues(alpha: 0.1),
-                    label: 'Mes connexions',
+                    label: 'Mes\nconnexions',
                     onTap: widget.onShowConnections,
+                  ),
+                  _buildActionCard(
+                    icon: Icons.business_outlined,
+                    iconColor: const Color(0xFF6366F1), // Indigo
+                    iconBgColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                    label: 'Partenaires',
+                    onTap: widget.onNavigateToPartners,
                   ),
                 ],
               );
@@ -1133,130 +1152,18 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     int? badge,
     required VoidCallback onTap,
   }) {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 200),
-      tween: Tween(begin: 1.0, end: 1.0),
-      builder: (context, scale, child) {
-        return Transform.scale(
-          scale: scale,
-          child: Material(
-            color: Colors.transparent,
-              child: InkWell(
-              onTap: () {
-                // Animation de pression
-                _animateCardPress(context, onTap);
-              },
-              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-              splashColor: iconColor.withValues(alpha: 0.1),
-              highlightColor: iconColor.withValues(alpha: 0.05),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.all(AppSpacing.spacing3),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-                  border: Border.all(
-                    color: AppColors.gray200,
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      offset: const Offset(0, 2),
-                      blurRadius: 8,
-                      spreadRadius: 0,
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.spacing1),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            width: 35,
-                            height: 35,
-                            decoration: BoxDecoration(
-                              color: iconBgColor,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                            ),
-                            child: Icon(
-                              icon,
-                              color: iconColor,
-                              size: 18,
-                            ),
-                          ),
-                          if (badge != null)
-                            Positioned(
-                              right: -6,
-                              top: -6,
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.error,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    badge.toString(),
-                                    style: AppTypography.caption.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.spacing1),
-                      Expanded(
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodySmall.copyWith(
-                            color: AppColors.textPrimaryLight,
-                            fontWeight: FontWeight.w500,
-                            height: 1.2,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Animation de pression pour les cartes
-  void _animateCardPress(BuildContext context, VoidCallback onTap) {
-    // Animation de vibration haptique (si disponible)
-    // HapticFeedback.lightImpact();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     
-    // Animation de scale
-    final animationController = AnimationController(
-      duration: const Duration(milliseconds: 100),
-      vsync: Navigator.of(context),
+    return _ActionCardStateful(
+      icon: icon,
+      iconColor: iconColor,
+      iconBgColor: iconBgColor,
+      label: label,
+      badge: badge,
+      onTap: onTap,
+      isDark: isDark,
     );
-    
-    animationController.forward().then((_) {
-      animationController.reverse().then((_) {
-        animationController.dispose();
-        onTap();
-      });
-    });
   }
 
   /// Section Connexions récentes (basé sur les consents)
@@ -1553,5 +1460,203 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
       ),
     );
   }
+}
 
+/// Widget stateful pour gérer l'animation de la carte
+class _ActionCardStateful extends StatefulWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBgColor;
+  final String label;
+  final int? badge;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  const _ActionCardStateful({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBgColor,
+    required this.label,
+    this.badge,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  @override
+  State<_ActionCardStateful> createState() => _ActionCardStatefulState();
+}
+
+class _ActionCardStatefulState extends State<_ActionCardStateful>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails details) {
+    setState(() => _isPressed = true);
+    _scaleController.forward();
+    HapticFeedback.lightImpact();
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    setState(() => _isPressed = false);
+    _scaleController.reverse().then((_) {
+      widget.onTap();
+    });
+  }
+
+  void _handleTapCancel() {
+    setState(() => _isPressed = false);
+    _scaleController.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.spacing3,
+              vertical: AppSpacing.spacing2,
+            ),
+            decoration: BoxDecoration(
+              color: widget.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              border: Border.all(
+                color: widget.isDark 
+                    ? AppColors.gray700 
+                    : AppColors.gray200,
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: widget.isDark ? 0.3 : 0.05,
+                  ),
+                  offset: const Offset(0, 2),
+                  blurRadius: _isPressed ? 4 : 8,
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: widget.iconColor.withValues(alpha: 0.08),
+                  offset: const Offset(0, 0),
+                  blurRadius: 12,
+                  spreadRadius: -2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: widget.iconBgColor,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: widget.iconColor,
+                        size: 18,
+                      ),
+                    ),
+                    if (widget.badge != null && widget.badge! > 0)
+                      Positioned(
+                        right: -4,
+                        top: -4,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: widget.isDark 
+                                  ? AppColors.surfaceDark 
+                                  : AppColors.surfaceLight,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.error.withValues(alpha: 0.3),
+                                offset: const Offset(0, 2),
+                                blurRadius: 4,
+                                spreadRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              widget.badge! > 99 ? '99+' : widget.badge.toString(),
+                              style: AppTypography.caption.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.spacing1),
+                Flexible(
+                  child: Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodySmall.copyWith(
+                      color: widget.isDark 
+                          ? AppColors.textPrimaryDark 
+                          : AppColors.textPrimaryLight,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

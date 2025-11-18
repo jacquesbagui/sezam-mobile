@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
@@ -83,7 +84,12 @@ class _RequestsScreenState extends State<RequestsScreen> {
           if (widget.onBackToDashboard != null) {
             widget.onBackToDashboard!();
           } else {
-            Navigator.pop(context);
+            // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /dashboard
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              context.go('/dashboard');
+            }
           }
         },
       ),
@@ -228,9 +234,23 @@ class _RequestsScreenState extends State<RequestsScreen> {
           );
         }
 
-        final requests = _selectedTabIndex == 0 
+        List<ConsentModel> requests = _selectedTabIndex == 0 
             ? consentProvider.pendingConsents 
             : consentProvider.deniedConsents;
+
+        // Trier par date décroissante (plus récentes en premier)
+        requests = List<ConsentModel>.from(requests);
+        requests.sort((a, b) {
+          // Pour les demandes en attente, utiliser createdAt
+          // Pour les demandes refusées, utiliser deniedAt ou createdAt
+          final dateA = _selectedTabIndex == 0 
+              ? a.createdAt 
+              : (a.deniedAt ?? a.createdAt);
+          final dateB = _selectedTabIndex == 0 
+              ? b.createdAt 
+              : (b.deniedAt ?? b.createdAt);
+          return dateB.compareTo(dateA);
+        });
 
         if (requests.isEmpty) {
           return _buildEmptyState();

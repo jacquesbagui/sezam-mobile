@@ -154,43 +154,13 @@ class _SplashScreenState extends State<SplashScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Logo de l'application
-                    Container(
+                    Image.asset(
+                      'assets/logo/splash_logo.png',
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(AppSpacing.radius2xl),
-                        boxShadow: AppSpacing.primaryShadow,
-                      ),
-                      child: const Icon(
-                        Icons.security,
-                        size: 60,
-                        color: AppColors.textPrimaryDark,
-                      ),
+                      fit: BoxFit.contain,
                     ),
                     const SizedBox(height: AppSpacing.spacing8),
-                    
-                    // Nom de l'application
-                    Text(
-                      'SEZAM',
-                      style: AppTypography.headline1.copyWith(
-                        color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacing2),
-                    
-                    // Slogan
-                    Text(
-                      'Votre identité numérique sécurisée',
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.spacing16),
-                    
                     // Indicateur de chargement
                     SizedBox(
                       width: 40,

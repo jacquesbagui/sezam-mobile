@@ -9,6 +9,7 @@ import '../../core/models/notification_model.dart';
 import '../../core/providers/notification_provider.dart';
 import '../../core/services/consent_service.dart';
 import '../requests/request_detail_screen.dart';
+import '../connections/connection_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -169,9 +170,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationsList(NotificationProvider notificationProvider) {
-    final notifications = _selectedTabIndex == 0
+    List<NotificationModel> notifications = _selectedTabIndex == 0
         ? notificationProvider.notifications
         : notificationProvider.unreadNotifications;
+
+    // Trier par date décroissante (plus récentes en premier)
+    notifications = List<NotificationModel>.from(notifications);
+    notifications.sort((a, b) {
+      // Utiliser sentAt si disponible, sinon createdAt
+      final dateA = a.sentAt ?? a.createdAt;
+      final dateB = b.sentAt ?? b.createdAt;
+      return dateB.compareTo(dateA);
+    });
 
     if (notifications.isEmpty) {
       return _buildEmptyState();
@@ -437,11 +447,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         case 'consent_granted':
         case 'consent_denied':
         case 'consent_revoked':
-          print('📍 Navigation vers requests');
-          context.go('/dashboard');
-          await Future.delayed(const Duration(milliseconds: 300));
-          if (mounted) {
-            context.push('/requests');
+          // Si un consentId est fourni, naviguer vers les détails de la connexion
+          if (consentId != null) {
+            print('📍 Navigation vers détail de connexion: $consentId');
+            await _navigateToConsent(consentId);
+          } else {
+            // Sinon, naviguer vers la liste des connexions
+            print('📍 Navigation vers connections');
+            context.go('/connections');
           }
           break;
 
@@ -471,36 +484,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       // Charger le consentement depuis l'API
       final consent = await ConsentService().getConsentById(consentId);
       if (consent == null) {
-        // À défaut, ouvrir la liste des demandes
-        context.go('/dashboard');
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          context.push('/requests');
-        }
+        // À défaut, ouvrir la liste des connexions
+        context.go('/connections');
         return;
       }
 
-      // Naviguer vers le dashboard d'abord, puis vers le détail
-      context.go('/dashboard');
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Naviguer vers le détail de la connexion
+      // Utiliser ConnectionDetailScreen pour les connexions (consent_granted, consent_denied, consent_revoked)
+      // et RequestDetailScreen pour les demandes en attente (consent_request)
+      final isConnection = consent.isGranted || consent.revokedAt != null || consent.deniedAt != null;
       
-      if (mounted) {
+      if (isConnection) {
+        // Pour les connexions, utiliser ConnectionDetailScreen
         await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => RequestDetailScreen(
-              consent: consent,
-              currentTabIndex: 0,
-            ),
+            builder: (_) => ConnectionDetailScreen(consent: consent),
           ),
         );
+      } else {
+        // Pour les demandes en attente, utiliser RequestDetailScreen
+        context.go('/dashboard');
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RequestDetailScreen(
+                consent: consent,
+                currentTabIndex: 0,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('❌ Erreur de navigation vers le consentement: $e');
-      // Fallback: ouvrir la liste des demandes
-      context.go('/dashboard');
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Fallback: ouvrir la liste des connexions
       if (mounted) {
-        context.push('/requests');
+        context.go('/connections');
       }
     }
   }

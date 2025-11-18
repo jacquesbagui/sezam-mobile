@@ -187,7 +187,14 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () => Navigator.pop(context),
+        onPressed: () {
+          // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /requests
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            context.go('/requests');
+          }
+        },
       ),
       title: Text(
         'Détails de la demande',
@@ -979,9 +986,15 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
               textColor: Colors.white,
               onPressed: () {
                 // Fermer la demande et naviguer vers la page des documents
-                Navigator.pop(context);
-                // Utiliser push pour garder la route précédente dans la pile
-                context.push('/documents');
+                // Navigation sécurisée : vérifier si on peut pop, sinon naviguer directement
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                  // Utiliser push pour garder la route précédente dans la pile
+                  context.push('/documents');
+                } else {
+                  // Si on ne peut pas pop, naviguer directement vers /documents
+                  context.go('/documents');
+                }
               },
             ),
             duration: const Duration(seconds: 5),
@@ -1188,7 +1201,12 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       AppEventService.instance.emit(AppEventType.consentGranted);
       
       if (mounted) {
-        Navigator.pop(context, {'action': 'granted', 'consent': widget.consent});
+        // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /requests
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, {'action': 'granted', 'consent': widget.consent});
+        } else {
+          context.go('/requests');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1208,9 +1226,15 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
                 label: 'Ajouter',
                 textColor: Colors.white,
                 onPressed: () {
-                  Navigator.pop(context);
-                  // Utiliser push pour garder la route précédente dans la pile
-                  context.push('/documents');
+                  // Navigation sécurisée : vérifier si on peut pop, sinon naviguer directement
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                    // Utiliser push pour garder la route précédente dans la pile
+                    context.push('/documents');
+                  } else {
+                    // Si on ne peut pas pop, naviguer directement vers /documents
+                    context.go('/documents');
+                  }
                 },
               ),
             ),
@@ -1343,7 +1367,12 @@ class _RequestDetailScreenState extends State<RequestDetailScreen> {
       AppEventService.instance.emit(AppEventType.consentDenied);
       
       if (mounted) {
-        Navigator.pop(context, {'action': 'denied', 'consent': widget.consent});
+        // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /requests
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context, {'action': 'denied', 'consent': widget.consent});
+        } else {
+          context.go('/requests');
+        }
       }
     } catch (e) {
       if (mounted) {

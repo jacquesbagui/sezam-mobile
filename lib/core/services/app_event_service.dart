@@ -15,6 +15,7 @@ enum AppEventType {
   consentRequested,
   consentGranted,
   consentDenied,
+  consentRevoked,
   documentUploaded,
   documentVerified,
   documentRejected,
@@ -161,6 +162,7 @@ class AppEventService {
       case AppEventType.consentRequested:
       case AppEventType.consentGranted:
       case AppEventType.consentDenied:
+      case AppEventType.consentRevoked:
         // Le cache sera invalidé quand on obtiendra le contexte
         _log('📋 Cache des consentements sera invalidé au prochain accès');
         break;
@@ -209,6 +211,7 @@ class AppEventService {
       case AppEventType.consentRequested:
       case AppEventType.consentGranted:
       case AppEventType.consentDenied:
+      case AppEventType.consentRevoked:
         _log('🔄 Actions: Rafraîchissement des consentements et notifications');
         return [
           (ctx) => _safeRefresh(ctx, () async {

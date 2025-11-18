@@ -37,6 +37,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       case 'consent_denied':
         AppEventService.instance.emit(AppEventType.consentDenied);
         break;
+      case 'consent_revoked':
+        AppEventService.instance.emit(AppEventType.consentRevoked);
+        break;
       case 'profile_validated':
         AppEventService.instance.emit(AppEventType.profileValidated);
         break;

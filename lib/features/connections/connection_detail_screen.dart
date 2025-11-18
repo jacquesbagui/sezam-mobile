@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
@@ -25,7 +26,14 @@ class ConnectionDetailScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /connections
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              context.go('/connections');
+            }
+          },
         ),
         title: Text(
           'Détails de la connexion',
@@ -255,18 +263,22 @@ class ConnectionDetailScreen extends StatelessWidget {
     IconData icon = Icons.security;
     Color iconColor = AppColors.primary;
     
+    // Utiliser la couleur basée sur la sensibilité du scope
+    if (scope is ScopeModel && scope.isSensitive) {
+      iconColor = AppColors.warning;
+    } else if (scope is Map && (scope['is_sensitive'] == true)) {
+      iconColor = AppColors.warning;
+    }
+    
+    // Déterminer l'icône selon le type de scope
     if (scope.name.contains('email') || scope.name.contains('phone')) {
       icon = Icons.contact_mail;
-      iconColor = AppColors.warning;
     } else if (scope.name.contains('document') || scope.name.contains('identity')) {
       icon = Icons.badge;
-      iconColor = AppColors.secondary;
     } else if (scope.name.contains('ademe') || scope.name.contains('financial')) {
       icon = Icons.account_balance;
-      iconColor = AppColors.error;
     } else if (scope.name.contains('profile')) {
       icon = Icons.person;
-      iconColor = AppColors.success;
     }
     
     // Ajuster les couleurs si le scope est désactivé
@@ -672,8 +684,13 @@ class ConnectionDetailScreen extends StatelessWidget {
                       duration: const Duration(seconds: 3),
                     ),
                   );
-                  // Recharger les données
-                  Navigator.pop(context);
+                  // Recharger les données - navigation sécurisée
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    // Si on ne peut pas pop, naviguer vers /connections
+                    context.go('/connections');
+                  }
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -837,20 +854,22 @@ class ConnectionDetailScreen extends StatelessWidget {
   }
 
   /// Vérifier si un scope est requis (ne peut pas être désactivé)
+  /// Un scope est requis UNIQUEMENT s'il nécessite un consentement explicite
+  /// Les scopes de la demande initiale ne sont plus automatiquement requis
   bool _isScopeRequired(dynamic scope) {
-    // Si c'est un objet ScopeModel, vérifier la propriété
+    // Si c'est un objet ScopeModel, vérifier uniquement requiresExplicitConsent
     if (scope is ScopeModel) {
-      return scope.isRequired;
+      return scope.requiresExplicitConsent;
     }
-    // Vérifier si le scope a la propriété is_required (Map ou autre)
+    // Vérifier si le scope a la propriété requires_explicit_consent (Map ou autre)
     if (scope is Map) {
-      return scope['is_required'] == true;
+      return scope['requires_explicit_consent'] == true;
     }
     // Sinon, essayer d'accéder via toJson() si disponible
     try {
       if (scope != null && scope.runtimeType.toString().contains('Scope')) {
         final scopeMap = scope.toJson();
-        return scopeMap['is_required'] == true;
+        return scopeMap['requires_explicit_consent'] == true;
       }
     } catch (e) {
       // Si la propriété n'existe pas, retourner false
@@ -920,7 +939,13 @@ class ConnectionDetailScreen extends StatelessWidget {
                       duration: const Duration(seconds: 4),
                     ),
                   );
-                  Navigator.pop(context);
+                  // Navigation sécurisée : vérifier si on peut pop, sinon naviguer vers /connections
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    // Si on ne peut pas pop (écran ouvert depuis notification), naviguer vers /connections
+                    context.go('/connections');
+                  }
                 }
               } catch (e) {
                 if (context.mounted) {

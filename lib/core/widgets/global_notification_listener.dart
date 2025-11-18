@@ -120,6 +120,10 @@ class _GlobalNotificationListenerState extends State<GlobalNotificationListener>
           _showConsentDeniedNotification(scaffoldMessenger);
           break;
         
+        case AppEventType.consentRevoked:
+          _showConsentRevokedNotification(scaffoldMessenger);
+          break;
+        
         case AppEventType.userCodeGenerated:
           _showUserCodeGeneratedNotification(scaffoldMessenger);
           break;
@@ -397,6 +401,45 @@ class _GlobalNotificationListenerState extends State<GlobalNotificationListener>
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+      ),
+    );
+  }
+
+  /// Afficher une notification pour un consentement révoqué
+  void _showConsentRevokedNotification(ScaffoldMessengerState scaffoldMessenger) {
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.block,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: AppSpacing.spacing2),
+            Expanded(
+              child: Text(
+                'Connexion révoquée',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppColors.warning,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+        action: SnackBarAction(
+          label: 'Voir',
+          textColor: Colors.white,
+          onPressed: () {
+            // Navigation sera gérée par PushNotificationService
+          },
         ),
       ),
     );
