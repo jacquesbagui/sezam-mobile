@@ -29,18 +29,14 @@ class SezamCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    Widget cardContent = Container(
+  Widget build(BuildContext context) {    Widget cardContent = Container(
       padding: padding ?? const EdgeInsets.all(AppSpacing.spacing4),
       margin: margin,
       decoration: BoxDecoration(
-        color: backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+        color: backgroundColor ?? (AppColors.surfaceLight),
         borderRadius: borderRadius ?? BorderRadius.circular(AppSpacing.radiusMd),
         border: border ?? Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
         boxShadow: isElevated ? (boxShadow ?? AppSpacing.shadowSm) : null,
@@ -88,17 +84,13 @@ class SezamCardWithHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    Widget cardContent = Container(
+  Widget build(BuildContext context) {    Widget cardContent = Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: backgroundColor ?? (isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+        color: backgroundColor ?? (AppColors.surfaceLight),
         borderRadius: borderRadius ?? BorderRadius.circular(AppSpacing.radiusMd),
         border: border ?? Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
         boxShadow: isElevated ? (boxShadow ?? AppSpacing.shadowSm) : null,

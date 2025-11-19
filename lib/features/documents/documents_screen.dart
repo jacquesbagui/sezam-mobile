@@ -90,7 +90,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           // Retour en arrière
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
+          } else if (widget.onBackToDashboard != null) {
+            // Utiliser le callback pour retourner au dashboard si on est dans la bottom nav
+            widget.onBackToDashboard!();
           } else {
+            // Fallback: navigation par route
             context.go('/dashboard');
           }
         },

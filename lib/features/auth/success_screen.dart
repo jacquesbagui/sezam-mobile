@@ -76,12 +76,8 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+  Widget build(BuildContext context) {    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.spacing6),
@@ -134,7 +130,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                   child: Text(
                     'Compte créé avec succès !',
                     style: AppTypography.headline1.copyWith(
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                      color: AppColors.textPrimaryLight,
                       fontWeight: FontWeight.bold,
                       fontSize: 28,
                     ),
@@ -153,7 +149,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                   child: Text(
                     'Bienvenue sur SEZAM ! Votre compte a été créé avec succès. Pour accéder à tous les services, vous devez compléter votre profil KYC.',
                     style: AppTypography.bodyLarge.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: AppColors.textSecondaryLight,
                       height: 1.6,
                     ),
                     textAlign: TextAlign.center,
@@ -200,7 +196,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                               child: Text(
                                 'Vérification d\'identité (KYC)',
                                 style: AppTypography.headline3.copyWith(
-                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                  color: AppColors.textPrimaryLight,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
                                 ),
@@ -212,19 +208,16 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                         _buildInfoItem(
                           icon: Icons.person_outline,
                           text: 'Informations personnelles',
-                          isDark: isDark,
                         ),
                         const SizedBox(height: AppSpacing.spacing3),
                         _buildInfoItem(
                           icon: Icons.credit_card_outlined,
                           text: 'Documents d\'identité',
-                          isDark: isDark,
                         ),
                         const SizedBox(height: AppSpacing.spacing3),
                         _buildInfoItem(
                           icon: Icons.shield_outlined,
                           text: 'Sécurité et confidentialité',
-                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -264,7 +257,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
                   child: Text(
                     'Continuer plus tard',
                     style: AppTypography.bodyMedium.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      color: AppColors.textSecondaryLight,
                     ),
                   ),
                 ),
@@ -279,7 +272,6 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
   Widget _buildInfoItem({
     required IconData icon,
     required String text,
-    required bool isDark,
   }) {
     return Row(
       children: [
@@ -293,7 +285,7 @@ class _RegistrationSuccessScreenState extends State<RegistrationSuccessScreen>
           child: Text(
             text,
             style: AppTypography.bodyMedium.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: AppColors.textSecondaryLight,
             ),
           ),
         ),

@@ -131,24 +131,89 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
     print('🔐 _isIdCardUploaded: uploadedDocuments = ${status.uploadedDocuments}');
     print('🔐 _isIdCardUploaded: _requiredDocs = $_requiredDocs');
     
-    String? idCardId;
+    // Vérifier pour identity_card, passport, ou id_card
+    // Note: uploadedDocuments contient les document_type_id, donc si on a recto+verso,
+    // on aura 2 fois le même ID, mais contains() retournera true si au moins un existe
+    // Pour les documents avec sides_required='both', on considère qu'ils sont complets
+    // si l'ID est présent (car cela signifie qu'au moins un côté est uploadé, et le backend
+    // devrait vérifier que les deux sont présents dans getMissingDocuments)
     for (final d in _requiredDocs) {
-      if ((d['name'] ?? '') == 'id_card') {
-        idCardId = (d['id'] ?? '').toString();
-        print('🔐 _isIdCardUploaded: found id_card with id = $idCardId');
-        break;
+      final name = (d['name'] ?? '').toString();
+      if (name == 'identity_card' || name == 'passport' || name == 'id_card') {
+        final id = (d['id'] ?? '').toString();
+        final sidesRequired = (d['sides_required'] ?? 'none').toString();
+        
+        if (id.isNotEmpty && status.uploadedDocuments.contains(id)) {
+          // Si le document nécessite les deux côtés, vérifier qu'il n'est pas dans missingDocuments
+          // (car le backend devrait le marquer comme manquant si un côté manque)
+          if (sidesRequired == 'both') {
+            // Vérifier qu'il n'est pas dans missingDocuments
+            final isMissing = status.missingDocuments.any((missing) {
+              final missingStr = missing.toString().toLowerCase();
+              return missingStr.contains('identity') || missingStr.contains('passport');
+            });
+            if (!isMissing) {
+              print('🔐 _isIdCardUploaded: found complete identity document (recto + verso) with id = $id');
+              return true;
+            }
+          } else {
+            // Document simple (passport, etc.)
+            print('🔐 _isIdCardUploaded: found uploaded identity document with id = $id');
+            return true;
+          }
+      }
+    }
+    }
+    
+    // Vérifier par nom aussi
+    final identityNames = ['identity_card', 'passport', 'id_card'];
+    for (final name in identityNames) {
+      if (status.uploadedDocuments.contains(name)) {
+        print('🔐 _isIdCardUploaded: found uploaded identity document by name = $name');
+        return true;
       }
     }
     
-    if (idCardId != null && idCardId.isNotEmpty) {
-      final containsId = status.uploadedDocuments.contains(idCardId);
-      print('🔐 _isIdCardUploaded: checking by id ($idCardId) = $containsId');
-      return containsId;
+    print('🔐 _isIdCardUploaded: no identity document found');
+    return false;
+  }
+
+  bool _isPhotoUploaded(ProfileProvider profileProvider) {
+    final status = profileProvider.profileStatus;
+    if (status == null) return false;
+    
+    // Vérifier pour photo
+    for (final d in _requiredDocs) {
+      final name = (d['name'] ?? '').toString();
+      if (name == 'photo') {
+        final id = (d['id'] ?? '').toString();
+        if (id.isNotEmpty && status.uploadedDocuments.contains(id)) {
+          return true;
+        }
+      }
     }
     
-    final containsName = status.uploadedDocuments.contains('id_card');
-    print('🔐 _isIdCardUploaded: checking by name (id_card) = $containsName');
-    return containsName;
+    // Vérifier par nom aussi
+    return status.uploadedDocuments.contains('photo');
+  }
+
+  bool _isAddressProofUploaded(ProfileProvider profileProvider) {
+    final status = profileProvider.profileStatus;
+    if (status == null) return false;
+    
+    // Vérifier pour proof_of_address
+    for (final d in _requiredDocs) {
+      final name = (d['name'] ?? '').toString();
+      if (name == 'proof_of_address') {
+        final id = (d['id'] ?? '').toString();
+        if (id.isNotEmpty && status.uploadedDocuments.contains(id)) {
+          return true;
+        }
+      }
+    }
+    
+    // Vérifier par nom aussi
+    return status.uploadedDocuments.contains('proof_of_address');
   }
 
   Future<void> _completeKyc() async {
@@ -457,75 +522,130 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
 
     // Construire depuis le backend si disponible
     final List<Map<String, dynamic>> documents = [];
+    bool hasIdentityDocument = false;
+    
     // Si on a la version avec IDs, on l'utilise pour marquer 'uploaded'
-    if (_requiredDocs.isNotEmpty && profileStatus != null) {
+    if (_requiredDocs.isNotEmpty) {
       for (final d in _requiredDocs) {
         final name = (d['name'] ?? '').toString();
         final id = (d['id'] ?? '').toString();
         if (name == 'salary_slip' && occupationName != 'Salarié') {
           continue;
         }
-        final uploaded = profileStatus.uploadedDocuments.contains(id);
+        
+        // Fusionner les documents d'identité (identity_card, passport) en un seul
+        // Pour le KYC, on demande UN SEUL document d'identité (CNI OU Passport)
+        if (name == 'identity_card' || name == 'passport' || name == 'id_card') {
+          if (!hasIdentityDocument) {
+            // Vérifier si N'IMPORTE QUEL document d'identité est uploadé (pas seulement celui-ci)
+            bool uploaded = false;
+            if (profileStatus != null) {
+              // Vérifier tous les types d'identité dans uploadedDocuments
+              for (final uploadedDoc in profileStatus.uploadedDocuments) {
+                final uploadedStr = uploadedDoc.toString().toLowerCase();
+                if (uploadedStr.contains('identity_card') || 
+                    uploadedStr.contains('passport') || 
+                    uploadedStr.contains('id_card')) {
+                  uploaded = true;
+                  break;
+                }
+              }
+              // Vérifier aussi par ID si pas trouvé par nom
+              if (!uploaded) {
+                for (final d in _requiredDocs) {
+                  final docName = (d['name'] ?? '').toString().toLowerCase();
+                  if ((docName == 'identity_card' || docName == 'passport' || docName == 'id_card')) {
+                    final docId = (d['id'] ?? '').toString();
+                    if (docId.isNotEmpty && profileStatus.uploadedDocuments.contains(docId)) {
+                      uploaded = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            documents.add({
+              'id': 'identity',
+              'typeId': id,
+              'icon': Icons.badge,
+              'title': 'Pièce d\'identité',
+              'subtitle': 'CNI, Passeport ou Carte d\'identité',
+              'required': true,
+              'uploaded': uploaded,
+              'isIdentity': true,
+            });
+            hasIdentityDocument = true;
+          }
+          continue;
+        }
+        
+        final uploaded = profileStatus?.uploadedDocuments.contains(id) ?? false;
+        // Marquer photo et proof_of_address comme requis
+        final isRequired = name == 'photo' || name == 'proof_of_address';
         documents.add({
           'id': name,
           'typeId': id,
           'icon': name == 'photo'
               ? Icons.photo_camera
               : (name == 'proof_of_address' ? Icons.home : Icons.badge),
-          'title': (
-            name == 'id_card'
-                ? 'Pièce d\'identité'
-                : (name == 'passport'
-                    ? 'Passeport'
-                    : (name == 'proof_of_address'
+          'title': name == 'proof_of_address'
                         ? 'Justificatif de domicile'
-                        : (name == 'salary_slip' ? 'Bulletin de salaire' : (name == 'photo' ? 'Photo d\'identité' : 'Document'))))
-          ),
-          'subtitle': (
-            name == 'proof_of_address'
+              : (name == 'salary_slip' ? 'Bulletin de salaire' : (name == 'photo' ? 'Photo d\'identité (Selfie)' : 'Document')),
+          'subtitle': name == 'proof_of_address'
                 ? 'Facture de moins de 3 mois'
-                : (name == 'photo'
-                    ? 'Photo récente format identité'
-                    : 'CNI, Passeport ou Carte d\'identité')
-          ),
-          'required': name == 'id_card',
+              : (name == 'photo' ? 'Photo récente format identité' : 'Document'),
+          'required': isRequired,
           'uploaded': uploaded,
         });
       }
     } else if (profileStatus != null && profileStatus.requiredDocuments.isNotEmpty) {
+      // Utiliser les documents requis depuis profileStatus
       for (final doc in profileStatus.requiredDocuments) {
         // Ne pas demander le bulletin de salaire si l'utilisateur n'est pas salarié
         if (doc == 'salary_slip' && occupationName != 'Salarié') {
           continue;
         }
+        
+        // Fusionner les documents d'identité
+        if (doc == 'identity_card' || doc == 'passport' || doc == 'id_card') {
+          if (!hasIdentityDocument) {
+            documents.add({
+              'id': 'identity',
+              'typeId': doc.toString(),
+              'icon': Icons.badge,
+              'title': 'Pièce d\'identité',
+              'subtitle': 'CNI, Passeport ou Carte d\'identité',
+              'required': true,
+              'uploaded': false,
+              'isIdentity': true,
+            });
+            hasIdentityDocument = true;
+          }
+          continue;
+        }
+        
+        // Marquer photo et proof_of_address comme requis
+        final isRequired = doc == 'photo' || doc == 'proof_of_address';
         documents.add({
           'id': doc.toString(),
           'typeId': doc.toString(),
           'icon': doc == 'photo'
               ? Icons.photo_camera
               : (doc == 'proof_of_address' ? Icons.home : Icons.badge),
-          'title': (
-            doc == 'id_card'
-                ? 'Pièce d\'identité'
-                : (doc == 'passport'
-                    ? 'Passeport'
-                    : (doc == 'proof_of_address'
+          'title': doc == 'proof_of_address'
                         ? 'Justificatif de domicile'
-                        : (doc == 'salary_slip' ? 'Bulletin de salaire' : (doc == 'photo' ? 'Photo d\'identité' : 'Document'))))
-          ),
-          'subtitle': (
-            doc == 'proof_of_address'
+              : (doc == 'salary_slip' ? 'Bulletin de salaire' : (doc == 'photo' ? 'Photo d\'identité (Selfie)' : 'Document')),
+          'subtitle': doc == 'proof_of_address'
                 ? 'Facture de moins de 3 mois'
-                : (doc == 'photo'
-                    ? 'Photo récente format identité'
-                    : 'CNI, Passeport ou Carte d\'identité')
-          ),
-          'required': doc == 'id_card',
+              : (doc == 'photo' ? 'Photo récente format identité' : 'Document'),
+          'required': isRequired,
           'uploaded': false,
         });
       }
-    } else {
-      // Fallback local
+    }
+    
+    // Si aucun document n'a été trouvé, utiliser le fallback local avec documents requis
+    if (documents.isEmpty) {
       documents.addAll([
         {
           'id': 'identity',
@@ -535,6 +655,16 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
           'subtitle': 'CNI, Passeport ou Carte d\'identité',
           'required': true,
           'uploaded': false,
+          'isIdentity': true,
+        },
+        {
+          'id': 'photo',
+          'typeId': null,
+          'icon': Icons.photo_camera,
+          'title': 'Photo d\'identité (Selfie)',
+          'subtitle': 'Photo récente format identité',
+          'required': true,
+          'uploaded': false,
         },
         {
           'id': 'address_proof',
@@ -542,16 +672,7 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
           'icon': Icons.home,
           'title': 'Justificatif de domicile',
           'subtitle': 'Facture de moins de 3 mois',
-          'required': false,
-          'uploaded': false,
-        },
-        {
-          'id': 'photo',
-          'typeId': null,
-          'icon': Icons.photo_camera,
-          'title': 'Photo d\'identité',
-          'subtitle': 'Photo récente format identité',
-          'required': false,
+          'required': true,
           'uploaded': false,
         },
       ]);
@@ -1145,23 +1266,36 @@ class _KycScreenState extends State<KycScreen> with SingleTickerProviderStateMix
     // Utiliser watch pour écouter les changements du ProfileProvider
     final profileProvider = context.watch<ProfileProvider>();
     
+    // Permettre la navigation entre les étapes (pas de blocage)
     bool canProceed = true;
     if (currentStepId == 'personal') {
-      canProceed = _isPersonalInfoComplete(context);
+      // Pour l'étape personnelle, on peut toujours continuer (l'utilisateur peut revenir)
+      canProceed = true;
     } else if (currentStepId == 'documents') {
-      canProceed = _isIdCardUploaded(profileProvider);
-      // Debug pour voir pourquoi le bouton n'est pas activé
-      if (!canProceed) {
-        print('🔐 _buildNavigationButtons: canProceed = false for documents step');
-      }
+      // Pour l'étape documents, on peut toujours continuer (l'utilisateur peut revenir)
+      canProceed = true;
     }
     
-    // Pour le bouton "Terminer", vérifier que tous les champs requis sont remplis
-    bool canCompleteKyc = true;
+    // Pour le bouton "Terminer", vérifier que TOUT est complet (champs + documents)
+    bool canCompleteKyc = false;
     if (isLastStep) {
-      canCompleteKyc = profileProvider.missingFields.isEmpty;
+      // Vérifier les champs requis
+      final hasAllFields = profileProvider.missingFields.isEmpty;
+      
+      // Vérifier les documents requis
+      final hasIdentityDoc = _isIdCardUploaded(profileProvider);
+      final hasPhoto = _isPhotoUploaded(profileProvider);
+      final hasAddressProof = _isAddressProofUploaded(profileProvider);
+      
+      canCompleteKyc = hasAllFields && hasIdentityDoc && hasPhoto && hasAddressProof;
+      
       if (!canCompleteKyc) {
-        print('🔐 _buildNavigationButtons: canCompleteKyc = false, missingFields = ${profileProvider.missingFields}');
+        print('🔐 _buildNavigationButtons: canCompleteKyc = false');
+        print('  - hasAllFields: $hasAllFields');
+        print('  - hasIdentityDoc: $hasIdentityDoc');
+        print('  - hasPhoto: $hasPhoto');
+        print('  - hasAddressProof: $hasAddressProof');
+        print('  - missingFields: ${profileProvider.missingFields}');
       }
     }
     

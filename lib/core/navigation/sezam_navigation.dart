@@ -18,18 +18,14 @@ class SezamBottomNavigation extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return RepaintBoundary(
+  Widget build(BuildContext context) {    return RepaintBoundary(
       child: Container(
         decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          color: AppColors.surfaceLight,
           boxShadow: AppSpacing.shadowLg,
           border: Border(
             top: BorderSide(
-              color: isDark ? AppColors.gray700 : AppColors.gray200,
+              color: AppColors.gray200,
               width: 1,
             ),
           ),
@@ -97,11 +93,8 @@ class SezamBottomNavigation extends StatelessWidget {
     required int index,
     required bool isActive,
     bool hasNotification = false,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final activeColor = AppColors.primary;
-    final inactiveColor = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+  }) {    final activeColor = AppColors.primary;
+    final inactiveColor = AppColors.textSecondaryLight;
 
     return RepaintBoundary(
       child: Material(
@@ -195,20 +188,16 @@ class SezamAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return AppBar(
+  Widget build(BuildContext context) {    return AppBar(
       title: Text(
         title,
         style: AppTypography.headline4.copyWith(
-          color: foregroundColor ?? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+          color: foregroundColor ?? (AppColors.textPrimaryLight),
         ),
       ),
       centerTitle: centerTitle,
-      backgroundColor: backgroundColor ?? (isDark ? AppColors.backgroundDark : AppColors.backgroundLight),
-      foregroundColor: foregroundColor ?? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+      backgroundColor: backgroundColor ?? (AppColors.backgroundLight),
+      foregroundColor: foregroundColor ?? (AppColors.textPrimaryLight),
       elevation: elevation ?? 0,
       leading: leading ?? (showBackButton ? const BackButton() : null),
       actions: actions,

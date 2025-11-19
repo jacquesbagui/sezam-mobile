@@ -12,9 +12,12 @@ import '../../features/kyc/kyc_screen.dart';
 import '../../features/requests/requests_screen.dart' as requests_feature;
 import '../../features/documents/documents_screen.dart' as documents_feature;
 import '../../features/connections/connections_screen.dart' as connections_feature;
+import '../../features/partners/partners_screen.dart' as partners_feature;
 import '../../features/auth/usage_purpose_screen.dart';
 import '../../features/auth/terms_consent_screen.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/utils/kyc_redirection.dart';
+import '../../core/services/profile_service.dart';
 
 /// Configuration des routes de l'application SEZAM
 class AppRouter {
@@ -77,12 +80,14 @@ class AppRouter {
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        redirect: (context, state) {
+        redirect: (context, state) async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
             return '/auth';
           }
-          return null;
+          // Vérifier si le KYC est complet
+          final kycRedirect = await KycRedirection.checkKycAndRedirect(context);
+          return kycRedirect;
         },
         builder: (context, state) => const DashboardScreen(),
       ),
@@ -91,20 +96,31 @@ class AppRouter {
       GoRoute(
         path: '/documents',
         name: 'documents',
-        redirect: (context, state) {
+        redirect: (context, state) async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
             return '/auth';
           }
-          return null;
+          // Vérifier si le KYC est complet
+          final kycRedirect = await KycRedirection.checkKycAndRedirect(context);
+          return kycRedirect;
         },
         builder: (context, state) => const documents_feature.DocumentsScreen(),
       ),
       
-      // Requests (use real feature screen)
+      // Requests - Protected route
       GoRoute(
         path: '/requests',
         name: 'requests',
+        redirect: (context, state) async {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          // Vérifier si le KYC est complet
+          final kycRedirect = await KycRedirection.checkKycAndRedirect(context);
+          return kycRedirect;
+        },
         builder: (context, state) => const requests_feature.RequestsScreen(),
       ),
       
@@ -112,17 +128,19 @@ class AppRouter {
       GoRoute(
         path: '/connections',
         name: 'connections',
-        redirect: (context, state) {
+        redirect: (context, state) async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
             return '/auth';
           }
-          return null;
+          // Vérifier si le KYC est complet
+          final kycRedirect = await KycRedirection.checkKycAndRedirect(context);
+          return kycRedirect;
         },
         builder: (context, state) => const connections_feature.ConnectionsScreen(),
       ),
       
-      // Profile - Protected route
+      // Profile - Protected route (permettre l'accès même si KYC incomplet pour compléter)
       GoRoute(
         path: '/profile',
         name: 'profile',
@@ -136,7 +154,7 @@ class AppRouter {
         builder: (context, state) => const ProfileScreen(),
       ),
       
-      // KYC - Protected route
+      // KYC - Protected route (toujours accessible si authentifié, pas de redirection KYC)
       GoRoute(
         path: '/kyc',
         name: 'kyc',
@@ -145,37 +163,69 @@ class AppRouter {
           if (!authProvider.isAuthenticated) {
             return '/auth';
           }
-          return null;
+          return null; // Toujours autoriser l'accès au KYC
         },
         builder: (context, state) => const KycScreen(),
       ),
       
-      // Usage Purpose - Protected route
+      // Usage Purpose - Protected route (nécessite KYC complet)
       GoRoute(
         path: '/usage-purpose',
         name: 'usage-purpose',
-        redirect: (context, state) {
+        redirect: (context, state) async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
             return '/auth';
+          }
+          // Vérifier que le KYC est complet avant d'accéder à usage-purpose
+          final isKycComplete = await KycRedirection.isKycComplete(context);
+          if (!isKycComplete) {
+            return '/kyc';
           }
           return null;
         },
         builder: (context, state) => const UsagePurposeScreen(),
       ),
       
-      // Terms Consent - Protected route
+      // Terms Consent - Protected route (nécessite KYC complet et usage_purpose)
       GoRoute(
         path: '/terms-consent',
         name: 'terms-consent',
-        redirect: (context, state) {
+        redirect: (context, state) async {
           final authProvider = Provider.of<AuthProvider>(context, listen: false);
           if (!authProvider.isAuthenticated) {
             return '/auth';
           }
+          // Vérifier que le KYC est complet
+          final isKycComplete = await KycRedirection.isKycComplete(context);
+          if (!isKycComplete) {
+            return '/kyc';
+          }
+          // Vérifier que usage_purpose est complété
+          final profileService = ProfileService();
+          final metadata = await profileService.checkOnboardingMetadata();
+          if (!(metadata['hasUsagePurpose'] ?? false)) {
+            return '/usage-purpose';
+          }
           return null;
         },
         builder: (context, state) => const TermsConsentScreen(),
+      ),
+      
+      // Partners - Protected route
+      GoRoute(
+        path: '/partners',
+        name: 'partners',
+        redirect: (context, state) async {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          if (!authProvider.isAuthenticated) {
+            return '/auth';
+          }
+          // Vérifier si le KYC est complet
+          final kycRedirect = await KycRedirection.checkKycAndRedirect(context);
+          return kycRedirect;
+        },
+        builder: (context, state) => const partners_feature.PartnersScreen(),
       ),
     ],
     errorBuilder: (context, state) => const ErrorScreen(),

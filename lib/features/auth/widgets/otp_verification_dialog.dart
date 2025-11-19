@@ -75,10 +75,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+  Widget build(BuildContext context) {    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -91,7 +88,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
         child: Container(
           constraints: const BoxConstraints(maxWidth: 400),
           decoration: BoxDecoration(
-            color: isDark ? AppColors.backgroundDark : Colors.white,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -135,7 +132,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
               Text(
                 'Vérification du code',
                 style: AppTypography.headline2.copyWith(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: AppColors.textPrimaryLight,
                   fontWeight: FontWeight.bold,
                   fontSize: keyboardHeight > 0 ? 20 : 24,
                 ),
@@ -148,7 +145,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
               Text(
                 'Entrez le code à 6 chiffres envoyé à',
                 style: AppTypography.bodyMedium.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: AppColors.textSecondaryLight,
                   fontSize: 14,
                 ),
                 textAlign: TextAlign.center,
@@ -254,9 +251,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                             curve: Curves.easeInOut,
                             height: 56,
                             decoration: BoxDecoration(
-                              color: isDark 
-                                  ? AppColors.backgroundDark.withValues(alpha: 0.5)
-                                  : Colors.white,
+                              color: Colors.white,
         
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -282,7 +277,7 @@ class _OtpVerificationDialogState extends State<OtpVerificationDialog> {
                                 contentPadding: EdgeInsets.zero,
                               ),
                               style: AppTypography.headline2.copyWith(
-                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                color: AppColors.textPrimaryLight,
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0,

@@ -208,5 +208,38 @@ class ProfileService {
       return false;
     }
   }
+  
+  /// Vérifier les métadonnées du profil (usage_purpose et terms_accepted)
+  /// Retourne un Map avec les statuts de chaque champ
+  Future<Map<String, bool>> checkOnboardingMetadata() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiConfig.userProfile,
+        fromJson: (json) => json,
+      );
+      
+      if (response.data == null) {
+        return {'hasUsagePurpose': false, 'hasTermsAccepted': false};
+      }
+      
+      final user = response.data!;
+      final metadata = user['metadata'] as Map<String, dynamic>?;
+      
+      if (metadata == null) {
+        return {'hasUsagePurpose': false, 'hasTermsAccepted': false};
+      }
+      
+      final hasUsagePurpose = metadata['usage_purpose'] != null;
+      final hasTermsAccepted = metadata['terms_accepted'] == true;
+      
+      return {
+        'hasUsagePurpose': hasUsagePurpose,
+        'hasTermsAccepted': hasTermsAccepted,
+      };
+    } catch (e) {
+      print('Erreur checkOnboardingMetadata: $e');
+      return {'hasUsagePurpose': false, 'hasTermsAccepted': false};
+    }
+  }
 }
 

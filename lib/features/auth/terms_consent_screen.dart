@@ -91,13 +91,9 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    if (_isInitializing) {
+  Widget build(BuildContext context) {    if (_isInitializing) {
       return Scaffold(
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        backgroundColor: AppColors.backgroundLight,
         body: const Center(
           child: CircularProgressIndicator(),
         ),
@@ -105,7 +101,7 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -144,7 +140,7 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
               Text(
                 'Conditions d\'utilisation',
                 style: AppTypography.headline2.copyWith(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: AppColors.textPrimaryLight,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -156,7 +152,7 @@ class _TermsConsentScreenState extends State<TermsConsentScreen> {
               Text(
                 'Pour continuer, veuillez lire et accepter nos conditions d\'utilisation et notre politique de confidentialité',
                 style: AppTypography.bodyMedium.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: AppColors.textSecondaryLight,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,

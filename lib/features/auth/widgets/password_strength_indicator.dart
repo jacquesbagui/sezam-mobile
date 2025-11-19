@@ -13,13 +13,9 @@ enum PasswordStrength {
 
 /// Widget pour afficher la force du mot de passe
 class PasswordStrengthIndicator extends StatelessWidget {
-  final PasswordStrength strength;
-  final bool isDark;
-
-  const PasswordStrengthIndicator({
+  final PasswordStrength strength;  const PasswordStrengthIndicator({
     super.key,
     required this.strength,
-    required this.isDark,
   });
 
   @override
@@ -34,7 +30,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
             Expanded(
               child: LinearProgressIndicator(
                 value: strengthData.progress,
-                backgroundColor: isDark ? AppColors.gray700 : AppColors.gray200,
+                backgroundColor: AppColors.gray200,
                 valueColor: AlwaysStoppedAnimation<Color>(strengthData.color),
                 minHeight: 4,
               ),
@@ -54,7 +50,7 @@ class PasswordStrengthIndicator extends StatelessWidget {
           Text(
             'Ajoutez des majuscules, chiffres et caractères spéciaux',
             style: AppTypography.caption.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: AppColors.textSecondaryLight,
             ),
           ),
         ],

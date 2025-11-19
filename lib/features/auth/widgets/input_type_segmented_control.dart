@@ -10,10 +10,7 @@ class InputTypeSegmentedControl extends StatelessWidget {
   final String secondLabel;
   final IconData firstIcon;
   final IconData secondIcon;
-  final Function(bool) onChanged;
-  final bool isDark;
-
-  const InputTypeSegmentedControl({
+  final Function(bool) onChanged;  const InputTypeSegmentedControl({
     super.key,
     required this.isFirstSelected,
     required this.firstLabel,
@@ -21,7 +18,6 @@ class InputTypeSegmentedControl extends StatelessWidget {
     required this.firstIcon,
     required this.secondIcon,
     required this.onChanged,
-    required this.isDark,
   });
 
   @override
@@ -29,10 +25,10 @@ class InputTypeSegmentedControl extends StatelessWidget {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.gray800 : AppColors.gray100,
+        color: AppColors.gray100,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
       ),
@@ -64,7 +60,7 @@ class InputTypeSegmentedControl extends StatelessWidget {
                       size: 16,
                       color: isFirstSelected
                           ? AppColors.textPrimaryLight
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                          : (AppColors.textSecondaryLight),
                     ),
                     const SizedBox(width: AppSpacing.spacing2),
                     Text(
@@ -72,7 +68,7 @@ class InputTypeSegmentedControl extends StatelessWidget {
                       style: AppTypography.bodyMedium.copyWith(
                         color: isFirstSelected
                             ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                            : (AppColors.textPrimaryLight),
                         fontWeight: isFirstSelected ? FontWeight.w600 : FontWeight.w500,
                         fontSize: 14,
                       ),
@@ -108,7 +104,7 @@ class InputTypeSegmentedControl extends StatelessWidget {
                       size: 16,
                       color: !isFirstSelected
                           ? AppColors.textPrimaryLight
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                          : (AppColors.textSecondaryLight),
                     ),
                     const SizedBox(width: AppSpacing.spacing2),
                     Text(
@@ -116,7 +112,7 @@ class InputTypeSegmentedControl extends StatelessWidget {
                       style: AppTypography.bodyMedium.copyWith(
                         color: !isFirstSelected
                             ? AppColors.textPrimaryLight
-                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                            : (AppColors.textPrimaryLight),
                         fontWeight: !isFirstSelected ? FontWeight.w600 : FontWeight.w500,
                         fontSize: 14,
                       ),

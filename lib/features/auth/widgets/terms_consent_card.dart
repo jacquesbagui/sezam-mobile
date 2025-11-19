@@ -58,11 +58,7 @@ class _TermsConsentCardState extends State<TermsConsentCard>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return ScaleTransition(
+  Widget build(BuildContext context) {    return ScaleTransition(
       scale: _scaleAnimation,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -74,16 +70,12 @@ class _TermsConsentCardState extends State<TermsConsentCard>
           decoration: BoxDecoration(
             color: widget.value
                 ? AppColors.primary.withValues(alpha: 0.1)
-                : isDark
-                    ? AppColors.surfaceDark
-                    : Colors.white,
+                : Colors.white,
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             border: Border.all(
               color: widget.value
                   ? AppColors.primary
-                  : isDark
-                      ? AppColors.borderDark
-                      : AppColors.borderLight,
+                  : AppColors.borderLight,
               width: widget.value ? 2 : 1,
             ),
             boxShadow: widget.value
@@ -115,9 +107,7 @@ class _TermsConsentCardState extends State<TermsConsentCard>
                   border: Border.all(
                     color: widget.value
                         ? AppColors.primary
-                        : isDark
-                            ? AppColors.gray500
-                            : AppColors.gray400,
+                        : AppColors.gray400,
                     width: 2,
                   ),
                 ),
@@ -135,9 +125,7 @@ class _TermsConsentCardState extends State<TermsConsentCard>
                 child: RichText(
                   text: TextSpan(
                     style: AppTypography.bodyMedium.copyWith(
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
+                      color: AppColors.textPrimaryLight,
                       height: 1.4,
                     ),
                     children: [

@@ -1152,9 +1152,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     int? badge,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
     return _ActionCardStateful(
       icon: icon,
       iconColor: iconColor,
@@ -1162,7 +1159,6 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
       label: label,
       badge: badge,
       onTap: onTap,
-      isDark: isDark,
     );
   }
 
@@ -1470,7 +1466,6 @@ class _ActionCardStateful extends StatefulWidget {
   final String label;
   final int? badge;
   final VoidCallback onTap;
-  final bool isDark;
 
   const _ActionCardStateful({
     required this.icon,
@@ -1479,7 +1474,6 @@ class _ActionCardStateful extends StatefulWidget {
     required this.label,
     this.badge,
     required this.onTap,
-    required this.isDark,
   });
 
   @override
@@ -1544,18 +1538,16 @@ class _ActionCardStatefulState extends State<_ActionCardStateful>
               vertical: AppSpacing.spacing2,
             ),
             decoration: BoxDecoration(
-              color: widget.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
               border: Border.all(
-                color: widget.isDark 
-                    ? AppColors.gray700 
-                    : AppColors.gray200,
+                color: AppColors.gray200,
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(
-                    alpha: widget.isDark ? 0.3 : 0.05,
+                    alpha: 0.05,
                   ),
                   offset: const Offset(0, 2),
                   blurRadius: _isPressed ? 4 : 8,
@@ -1606,9 +1598,7 @@ class _ActionCardStatefulState extends State<_ActionCardStateful>
                             color: AppColors.error,
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: widget.isDark 
-                                  ? AppColors.surfaceDark 
-                                  : AppColors.surfaceLight,
+                              color: AppColors.surfaceLight,
                               width: 2,
                             ),
                             boxShadow: [
@@ -1643,9 +1633,7 @@ class _ActionCardStatefulState extends State<_ActionCardStateful>
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.bodySmall.copyWith(
-                      color: widget.isDark 
-                          ? AppColors.textPrimaryDark 
-                          : AppColors.textPrimaryLight,
+                      color: AppColors.textPrimaryLight,
                       fontWeight: FontWeight.w600,
                       fontSize: 11,
                       height: 1.2,

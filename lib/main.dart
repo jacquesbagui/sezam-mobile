@@ -11,6 +11,7 @@ import 'core/providers/consent_provider.dart';
 import 'core/providers/document_provider.dart';
 import 'core/providers/profile_provider.dart';
 import 'core/providers/notification_provider.dart';
+import 'core/providers/partner_provider.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/app_event_service.dart';
 import 'core/widgets/app_lifecycle_listener.dart' show SezamAppLifecycleListener;
@@ -93,6 +94,7 @@ class SezamApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DocumentProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => PartnerProvider()),
       ],
       child: SezamAppLifecycleListener(
         child: GlobalNotificationListener(
@@ -102,8 +104,7 @@ class SezamApp extends StatelessWidget {
             
             // Thèmes
             theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
+            themeMode: ThemeMode.light,
             
             // Router
             routerConfig: AppRouter.router,

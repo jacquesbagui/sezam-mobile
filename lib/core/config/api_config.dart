@@ -48,6 +48,9 @@ class ApiConfig {
   static const String nationalities = '$apiPrefix/nationalities';
   static const String countries = '$apiPrefix/countries';
   
+  // Partners endpoints
+  static const String partners = '$apiPrefix/partners';
+  
   // Timeout
   static const Duration connectTimeout = Duration(seconds: 30);
   static const Duration receiveTimeout = Duration(seconds: 30);

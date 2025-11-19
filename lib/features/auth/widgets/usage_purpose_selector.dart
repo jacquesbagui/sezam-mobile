@@ -86,29 +86,23 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
       widget.customOptions ?? _defaultOptions;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Column(
+  Widget build(BuildContext context) {    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Motif d\'utilisation',
           style: AppTypography.bodyLarge.copyWith(
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+            color: AppColors.textPrimaryLight,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: AppSpacing.spacing3),
-        ..._options.map((option) => _buildOptionCard(option, isDark)),
+        ..._options.map((option) => _buildOptionCard(option)),
       ],
     );
   }
 
-  Widget _buildOptionCard(UsagePurposeOption option, bool isDark) {
+  Widget _buildOptionCard(UsagePurposeOption option) {
     final isSelected = widget.selectedPurpose == option.id;
 
     return Padding(
@@ -126,16 +120,12 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
           decoration: BoxDecoration(
             color: isSelected
                 ? AppColors.primary.withValues(alpha: 0.1)
-                : isDark
-                    ? AppColors.surfaceDark
-                    : Colors.white,
+                : Colors.white,
             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
             border: Border.all(
               color: isSelected
                   ? AppColors.primary
-                  : isDark
-                      ? AppColors.borderDark
-                      : AppColors.borderLight,
+                  : AppColors.borderLight,
               width: isSelected ? 2 : 1,
             ),
             boxShadow: isSelected
@@ -163,18 +153,14 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primary.withValues(alpha: 0.2)
-                      : isDark
-                          ? AppColors.gray700
-                          : AppColors.gray100,
+                      : AppColors.gray100,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
                 child: Icon(
                   option.icon,
                   color: isSelected
                       ? AppColors.primary
-                      : isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
+                      : AppColors.textSecondaryLight,
                   size: 24,
                 ),
               ),
@@ -187,9 +173,7 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
                     Text(
                       option.label,
                       style: AppTypography.bodyLarge.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimaryLight,
+                        color: AppColors.textPrimaryLight,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -197,9 +181,7 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
                     Text(
                       option.description,
                       style: AppTypography.bodySmall.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
+                        color: AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -216,9 +198,7 @@ class _UsagePurposeSelectorState extends State<UsagePurposeSelector> {
                   border: Border.all(
                     color: isSelected
                         ? AppColors.primary
-                        : isDark
-                            ? AppColors.gray500
-                            : AppColors.gray400,
+                        : AppColors.gray400,
                     width: 2,
                   ),
                 ),

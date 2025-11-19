@@ -43,21 +43,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+  Widget build(BuildContext context) {    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(
           'Notifications',
           style: AppTypography.headline4.copyWith(
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            color: AppColors.textPrimaryLight,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+        backgroundColor: AppColors.backgroundLight,
         elevation: 0,
       ),
       body: Selector<NotificationProvider, bool>(
@@ -87,16 +83,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildStatusTabs(NotificationProvider notificationProvider) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
+  Widget _buildStatusTabs(NotificationProvider notificationProvider) {    return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
       ),
@@ -129,13 +121,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     Icon(
                       isUnreadTab ? Icons.mark_email_unread : Icons.notifications,
                       size: 18,
-                      color: isSelected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                      color: isSelected ? Colors.white : (AppColors.textPrimaryLight),
                     ),
                     const SizedBox(width: AppSpacing.spacing2),
                     Text(
                       tab,
                       style: AppTypography.bodyMedium.copyWith(
-                        color: isSelected ? Colors.white : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                        color: isSelected ? Colors.white : (AppColors.textPrimaryLight),
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
@@ -197,10 +189,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final isEmpty = _selectedTabIndex == 0;
+  Widget _buildEmptyState() {    final isEmpty = _selectedTabIndex == 0;
 
     return Center(
       child: Padding(
@@ -217,7 +206,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             Text(
               isEmpty ? 'Aucune notification' : 'Aucune notification non lue',
               style: AppTypography.headline4.copyWith(
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                color: AppColors.textPrimaryLight,
                 fontWeight: FontWeight.bold,
               ),
               textAlign: TextAlign.center,
@@ -228,7 +217,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? 'Vous n\'avez pas encore de notifications.\nElles apparaîtront ici quand vous en recevrez.'
                   : 'Toutes vos notifications ont été lues.',
               style: AppTypography.bodyMedium.copyWith(
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: AppColors.textSecondaryLight,
               ),
               textAlign: TextAlign.center,
             ),
@@ -239,17 +228,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildNotificationCard(NotificationModel notification, int index) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final uiType = notification.uiType;
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.spacing4),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         border: Border.all(
-          color: notification.isRead ? (isDark ? AppColors.gray700 : AppColors.gray200) : AppColors.primary.withValues(alpha: 0.3),
+          color: notification.isRead ? (AppColors.gray200) : AppColors.primary.withValues(alpha: 0.3),
           width: notification.isRead ? 1 : 2,
         ),
       ),
@@ -283,7 +270,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       child: Text(
                         notification.title,
                         style: AppTypography.bodyLarge.copyWith(
-                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          color: AppColors.textPrimaryLight,
                           fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.bold,
                         ),
                       ),
@@ -303,7 +290,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 Text(
                   notification.body,
                   style: AppTypography.bodyMedium.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: AppColors.textSecondaryLight,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -314,7 +301,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     Text(
                       _formatDate(notification.createdAt),
                       style: AppTypography.bodyXSmall.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: AppColors.textSecondaryLight,
                       ),
                     ),
                     const Spacer(),

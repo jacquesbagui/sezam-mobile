@@ -318,11 +318,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: AppColors.backgroundLight,
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
@@ -356,7 +353,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           Text(
                             'Bienvenue sur SEZAM',
                             style: AppTypography.headline2.copyWith(
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                              color: AppColors.textPrimaryLight,
                               fontWeight: FontWeight.bold,
                               letterSpacing: -0.5,
                             ),
@@ -367,7 +364,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                                 ? 'Accédez à vos documents et services en toute sécurité'
                                 : 'Créez votre identité numérique et gérez vos documents',
                             style: AppTypography.bodyLarge.copyWith(
-                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              color: AppColors.textSecondaryLight,
                               height: 1.4,
                             ),
                             textAlign: TextAlign.center,
@@ -424,7 +421,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                           _toggleInputType();
                           HapticFeedback.selectionClick();
                         },
-                        isDark: isDark,
                       ),
 
                     const SizedBox(height: AppSpacing.spacing6),
@@ -514,7 +510,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                                 }
                                 return null;
                               },
-                              isDark: isDark,
                             ),
                             const SizedBox(height: AppSpacing.spacing4),
                           ],
@@ -551,7 +546,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                                   FocusScope.of(context).requestFocus(_passwordFocusNode);
                                 },
                                 validator: _validatePhone,
-                                isDark: isDark,
                               ),
                           ],
 
@@ -573,7 +567,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: AppColors.textSecondaryLight,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -590,7 +584,6 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                             const SizedBox(height: AppSpacing.spacing2),
                             PasswordStrengthIndicator(
                               strength: _getPasswordStrength(_passwordController.text),
-                              isDark: isDark,
                             ),
                           ],
 
@@ -610,7 +603,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: AppColors.textSecondaryLight,
                                 ),
                                 onPressed: () {
                                   setState(() {
@@ -687,7 +680,7 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
                         Text(
                           _isLogin ? 'Pas encore de compte ? ' : 'Déjà un compte ? ',
                           style: AppTypography.bodyMedium.copyWith(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: AppColors.textSecondaryLight,
                           ),
                         ),
                         TextButton(

@@ -262,16 +262,78 @@ class _EditProfileFieldScreenState extends State<EditProfileFieldScreen> {
   void initState() {
     super.initState();
     _countries = <Map<String, String>>[
+      // Côte d'Ivoire (par défaut)
       {'name': 'Côte d\'Ivoire', 'code': '+225', 'flag': '🇨🇮'},
-      {'name': 'France', 'code': '+33', 'flag': '🇫🇷'},
-      {'name': 'Belgique', 'code': '+32', 'flag': '🇧🇪'},
+      
+      // Afrique de l'Ouest
       {'name': 'Sénégal', 'code': '+221', 'flag': '🇸🇳'},
       {'name': 'Mali', 'code': '+223', 'flag': '🇲🇱'},
+      {'name': 'Guinée', 'code': '+224', 'flag': '🇬🇳'},
+      {'name': 'Burkina Faso', 'code': '+226', 'flag': '🇧🇫'},
+      {'name': 'Niger', 'code': '+227', 'flag': '🇳🇪'},
+      {'name': 'Togo', 'code': '+228', 'flag': '🇹🇬'},
+      {'name': 'Bénin', 'code': '+229', 'flag': '🇧🇯'},
+      {'name': 'Maurice', 'code': '+230', 'flag': '🇲🇺'},
+      {'name': 'Liberia', 'code': '+231', 'flag': '🇱🇷'},
+      {'name': 'Sierra Leone', 'code': '+232', 'flag': '🇸🇱'},
+      {'name': 'Ghana', 'code': '+233', 'flag': '🇬🇭'},
+      {'name': 'Nigeria', 'code': '+234', 'flag': '🇳🇬'},
+      {'name': 'Tchad', 'code': '+235', 'flag': '🇹🇩'},
+      {'name': 'République centrafricaine', 'code': '+236', 'flag': '🇨🇫'},
       {'name': 'Cameroun', 'code': '+237', 'flag': '🇨🇲'},
+      {'name': 'Cap-Vert', 'code': '+238', 'flag': '🇨🇻'},
+      {'name': 'São Tomé-et-Príncipe', 'code': '+239', 'flag': '🇸🇹'},
+      {'name': 'Guinée équatoriale', 'code': '+240', 'flag': '🇬🇶'},
+      {'name': 'Gabon', 'code': '+241', 'flag': '🇬🇦'},
+      {'name': 'République du Congo', 'code': '+242', 'flag': '🇨🇬'},
+      {'name': 'RD Congo', 'code': '+243', 'flag': '🇨🇩'},
+      {'name': 'Angola', 'code': '+244', 'flag': '🇦🇴'},
+      {'name': 'Guinée-Bissau', 'code': '+245', 'flag': '🇬🇼'},
+      {'name': 'Seychelles', 'code': '+248', 'flag': '🇸🇨'},
+      {'name': 'Soudan', 'code': '+249', 'flag': '🇸🇩'},
+      {'name': 'Rwanda', 'code': '+250', 'flag': '🇷🇼'},
+      {'name': 'Éthiopie', 'code': '+251', 'flag': '🇪🇹'},
+      {'name': 'Somalie', 'code': '+252', 'flag': '🇸🇴'},
+      {'name': 'Djibouti', 'code': '+253', 'flag': '🇩🇯'},
+      {'name': 'Kenya', 'code': '+254', 'flag': '🇰🇪'},
+      {'name': 'Tanzanie', 'code': '+255', 'flag': '🇹🇿'},
+      {'name': 'Ouganda', 'code': '+256', 'flag': '🇺🇬'},
+      {'name': 'Burundi', 'code': '+257', 'flag': '🇧🇮'},
+      {'name': 'Mozambique', 'code': '+258', 'flag': '🇲🇿'},
+      {'name': 'Zambie', 'code': '+260', 'flag': '🇿🇲'},
+      {'name': 'Madagascar', 'code': '+261', 'flag': '🇲🇬'},
+      {'name': 'La Réunion', 'code': '+262', 'flag': '🇷🇪'},
+      {'name': 'Zimbabwe', 'code': '+263', 'flag': '🇿🇼'},
+      {'name': 'Namibie', 'code': '+264', 'flag': '🇳🇦'},
+      {'name': 'Malawi', 'code': '+265', 'flag': '🇲🇼'},
+      {'name': 'Lesotho', 'code': '+266', 'flag': '🇱🇸'},
+      {'name': 'Botswana', 'code': '+267', 'flag': '🇧🇼'},
+      {'name': 'Eswatini', 'code': '+268', 'flag': '🇸🇿'},
+      {'name': 'Comores', 'code': '+269', 'flag': '🇰🇲'},
+      {'name': 'Érythrée', 'code': '+291', 'flag': '🇪🇷'},
+      
+      // Afrique du Nord
       {'name': 'Maroc', 'code': '+212', 'flag': '🇲🇦'},
+      {'name': 'Algérie', 'code': '+213', 'flag': '🇩🇿'},
       {'name': 'Tunisie', 'code': '+216', 'flag': '🇹🇳'},
-      {'name': 'Canada', 'code': '+1', 'flag': '🇨🇦'},
+      {'name': 'Libye', 'code': '+218', 'flag': '🇱🇾'},
+      {'name': 'Égypte', 'code': '+20', 'flag': '🇪🇬'},
+      
+      // Afrique du Sud
+      {'name': 'Afrique du Sud', 'code': '+27', 'flag': '🇿🇦'},
+      
+      // Mauritanie
+      {'name': 'Mauritanie', 'code': '+222', 'flag': '🇲🇷'},
+      
+      // Gambie
+      {'name': 'Gambie', 'code': '+220', 'flag': '🇬🇲'},
+      
+      // Autres pays (optionnels)
+      {'name': 'France', 'code': '+33', 'flag': '🇫🇷'},
+      {'name': 'Belgique', 'code': '+32', 'flag': '🇧🇪'},
       {'name': 'Royaume-Uni', 'code': '+44', 'flag': '🇬🇧'},
+      {'name': 'Canada', 'code': '+1', 'flag': '🇨🇦'},
+      {'name': 'États-Unis', 'code': '+1', 'flag': '🇺🇸'},
     ];
     _controller = TextEditingController(text: widget.initialValue);
     if (widget.fieldType == FieldType.phone) {

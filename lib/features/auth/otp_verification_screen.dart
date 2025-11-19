@@ -154,14 +154,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  Widget build(BuildContext context) {    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final email = widget.email ?? authProvider.otpEmail ?? '';
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -214,7 +211,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               Text(
                 'Vérification du code',
                 style: AppTypography.headline2.copyWith(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: AppColors.textPrimaryLight,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
@@ -226,7 +223,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               Text(
                 'Entrez le code à 6 chiffres envoyé à',
                 style: AppTypography.bodyMedium.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  color: AppColors.textSecondaryLight,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -364,7 +361,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                                 contentPadding: EdgeInsets.zero,
                               ),
                               style: AppTypography.headline2.copyWith(
-                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                color: AppColors.textPrimaryLight,
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0,

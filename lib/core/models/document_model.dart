@@ -7,6 +7,8 @@ part 'document_model.g.dart';
 class DocumentModel {
   final String id;
   
+  final String? side;
+  
   @JsonKey(name: 'document_number')
   final String? documentNumber;
   
@@ -39,6 +41,7 @@ class DocumentModel {
 
   DocumentModel({
     required this.id,
+    this.side,
     this.documentNumber,
     this.issueDate,
     this.expiryDate,
@@ -78,17 +81,26 @@ class DocumentType {
   
   @JsonKey(name: 'display_name')
   final String? displayName;
+  
+  @JsonKey(name: 'sides_required')
+  final String? sidesRequired; // 'none', 'recto', 'verso', 'both'
 
   DocumentType({
     required this.id,
     required this.name,
     this.displayName,
+    this.sidesRequired,
   });
 
   factory DocumentType.fromJson(Map<String, dynamic> json) =>
       _$DocumentTypeFromJson(json);
 
   Map<String, dynamic> toJson() => _$DocumentTypeToJson(this);
+  
+  bool get requiresRecto => sidesRequired == 'recto' || sidesRequired == 'both';
+  bool get requiresVerso => sidesRequired == 'verso' || sidesRequired == 'both';
+  bool get requiresBothSides => sidesRequired == 'both';
+  bool get requiresNoSide => sidesRequired == null || sidesRequired == 'none';
 }
 
 @JsonSerializable()

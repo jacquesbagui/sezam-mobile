@@ -9,6 +9,7 @@ part of 'document_model.dart';
 DocumentModel _$DocumentModelFromJson(Map<String, dynamic> json) =>
     DocumentModel(
       id: json['id'] as String,
+      side: json['side'] as String?,
       documentNumber: json['document_number'] as String?,
       issueDate: json['issue_date'] == null
           ? null
@@ -39,6 +40,7 @@ DocumentModel _$DocumentModelFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$DocumentModelToJson(DocumentModel instance) =>
     <String, dynamic>{
       'id': instance.id,
+      'side': instance.side,
       'document_number': instance.documentNumber,
       'issue_date': instance.issueDate?.toIso8601String(),
       'expiry_date': instance.expiryDate?.toIso8601String(),
@@ -56,6 +58,7 @@ DocumentType _$DocumentTypeFromJson(Map<String, dynamic> json) => DocumentType(
   id: json['id'] as String,
   name: json['name'] as String,
   displayName: json['display_name'] as String?,
+  sidesRequired: json['sides_required'] as String?,
 );
 
 Map<String, dynamic> _$DocumentTypeToJson(DocumentType instance) =>
@@ -63,6 +66,7 @@ Map<String, dynamic> _$DocumentTypeToJson(DocumentType instance) =>
       'id': instance.id,
       'name': instance.name,
       'display_name': instance.displayName,
+      'sides_required': instance.sidesRequired,
     };
 
 DocumentStatus _$DocumentStatusFromJson(Map<String, dynamic> json) =>

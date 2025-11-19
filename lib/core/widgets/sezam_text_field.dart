@@ -70,18 +70,14 @@ class _SezamTextFieldState extends State<SezamTextField> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Column(
+  Widget build(BuildContext context) {    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.label != null) ...[
           Text(
             widget.label!,
             style: AppTypography.label.copyWith(
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: AppColors.textPrimaryLight,
             ),
           ),
           const SizedBox(height: AppSpacing.spacing2),
@@ -100,7 +96,7 @@ class _SezamTextFieldState extends State<SezamTextField> {
           textInputAction: widget.textInputAction,
           focusNode: _focusNode,
           style: AppTypography.bodyMedium.copyWith(
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            color: AppColors.textPrimaryLight,
           ),
           decoration: InputDecoration(
             hintText: widget.hint,
@@ -109,17 +105,17 @@ class _SezamTextFieldState extends State<SezamTextField> {
             prefixIcon: widget.prefixIcon,
             suffixIcon: _buildSuffixIcon(),
             filled: true,
-            fillColor: isDark ? AppColors.gray800 : AppColors.gray50,
+            fillColor: AppColors.gray50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               borderSide: BorderSide(
-                color: isDark ? AppColors.gray600 : AppColors.gray300,
+                color: AppColors.gray300,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               borderSide: BorderSide(
-                color: isDark ? AppColors.gray600 : AppColors.gray300,
+                color: AppColors.gray300,
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -147,10 +143,10 @@ class _SezamTextFieldState extends State<SezamTextField> {
               vertical: AppSpacing.spacing3,
             ),
             hintStyle: AppTypography.bodyMedium.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: AppColors.textSecondaryLight,
             ),
             helperStyle: AppTypography.caption.copyWith(
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: AppColors.textSecondaryLight,
             ),
             errorStyle: AppTypography.caption.copyWith(
               color: AppColors.error,

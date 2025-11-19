@@ -52,6 +52,7 @@ class DocumentService {
   Future<DocumentModel> uploadDocument({
     required String documentTypeId,
     required String filePath,
+    String? side,
     String? documentNumber,
     String? issuingCountryId,
     DateTime? issueDate,
@@ -87,6 +88,9 @@ class DocumentService {
 
       // Fields
       request.fields['document_type_id'] = documentTypeId;
+      if (side != null && side.isNotEmpty) {
+        request.fields['side'] = side;
+      }
       if (documentNumber != null && documentNumber.isNotEmpty) {
         request.fields['document_number'] = documentNumber;
       }

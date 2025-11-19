@@ -32,12 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final List<int> _autoLockTimeouts = [1, 5, 10, 15, 30]; // minutes
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+  Widget build(BuildContext context) {    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: SezamAppBar(
         title: 'Paramètres',
         actions: [
@@ -45,7 +41,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: _showAboutDialog,
             icon: Icon(
               Icons.info_outline,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: AppColors.textPrimaryLight,
             ),
             tooltip: 'À propos',
           ),
@@ -74,17 +70,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildProfileSection() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
+  Widget _buildProfileSection() {    return Container(
       padding: const EdgeInsets.all(AppSpacing.spacing6),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
       ),
@@ -111,7 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   'John Doe',
                   style: AppTypography.headline4.copyWith(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    color: AppColors.textPrimaryLight,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -119,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   'john.doe@example.com',
                   style: AppTypography.bodyMedium.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: AppColors.textSecondaryLight,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.spacing2),
@@ -342,16 +334,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required IconData icon,
     required List<Widget> children,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
+  }) {    return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
-          color: isDark ? AppColors.gray700 : AppColors.gray200,
+          color: AppColors.gray200,
           width: 1,
         ),
       ),
@@ -371,7 +359,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   title,
                   style: AppTypography.bodyLarge.copyWith(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    color: AppColors.textPrimaryLight,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -389,11 +377,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Padding(
+  }) {    return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.spacing4,
         vertical: AppSpacing.spacing2,
@@ -407,7 +391,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   title,
                   style: AppTypography.bodyLarge.copyWith(
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    color: AppColors.textPrimaryLight,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -415,7 +399,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Text(
                   subtitle,
                   style: AppTypography.bodyMedium.copyWith(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: AppColors.textSecondaryLight,
                   ),
                 ),
               ],
@@ -440,11 +424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData trailing,
     required VoidCallback onTap,
     Color? textColor,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Material(
+  }) {    return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
@@ -462,7 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       title,
                       style: AppTypography.bodyLarge.copyWith(
-                        color: textColor ?? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+                        color: textColor ?? (AppColors.textPrimaryLight),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -470,7 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       subtitle,
                       style: AppTypography.bodyMedium.copyWith(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: AppColors.textSecondaryLight,
                       ),
                     ),
                   ],
@@ -479,7 +459,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icon(
                 trailing,
                 size: 16,
-                color: textColor ?? (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                color: textColor ?? (AppColors.textSecondaryLight),
               ),
             ],
           ),
@@ -488,13 +468,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Divider(
+  Widget _buildDivider() {    return Divider(
       height: 1,
-      color: isDark ? AppColors.gray700 : AppColors.gray200,
+      color: AppColors.gray200,
       indent: AppSpacing.spacing4,
       endIndent: AppSpacing.spacing4,
     );

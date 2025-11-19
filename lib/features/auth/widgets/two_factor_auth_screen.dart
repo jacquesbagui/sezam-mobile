@@ -198,12 +198,8 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+  Widget build(BuildContext context) {    return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
@@ -250,7 +246,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                             Text(
                               'Double authentification',
                               style: AppTypography.headline3.copyWith(
-                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                color: AppColors.textPrimaryLight,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: -0.5,
                               ),
@@ -259,7 +255,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                             Text(
                               'Confirmez votre identité pour valider la demande',
                               style: AppTypography.bodyLarge.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: AppColors.textSecondaryLight,
                                 height: 1.4,
                               ),
                               textAlign: TextAlign.center,
@@ -274,10 +270,10 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                       Container(
                         padding: const EdgeInsets.all(AppSpacing.spacing6),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                          color: AppColors.surfaceLight,
                           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(
-                            color: isDark ? AppColors.gray700 : AppColors.gray200,
+                            color: AppColors.gray200,
                             width: 1,
                           ),
                         ),
@@ -325,14 +321,14 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                                       Text(
                                         widget.request.title,
                                         style: AppTypography.bodyLarge.copyWith(
-                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                          color: AppColors.textPrimaryLight,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                       Text(
                                         widget.request.category,
                                         style: AppTypography.bodyMedium.copyWith(
-                                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                          color: AppColors.textSecondaryLight,
                                         ),
                                       ),
                                     ],
@@ -384,7 +380,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                       Text(
                         'Code de vérification',
                         style: AppTypography.bodyLarge.copyWith(
-                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          color: AppColors.textPrimaryLight,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -392,7 +388,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                       Text(
                         'Entrez le code à 6 chiffres envoyé sur votre téléphone',
                         style: AppTypography.bodyMedium.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                          color: AppColors.textSecondaryLight,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.spacing4),
@@ -403,30 +399,30 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                         textAlign: TextAlign.center,
                         maxLength: 6,
                         style: AppTypography.headline3.copyWith(
-                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          color: AppColors.textPrimaryLight,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 8,
                         ),
                         decoration: InputDecoration(
                           hintText: '000000',
                           hintStyle: AppTypography.headline3.copyWith(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: AppColors.textSecondaryLight,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 8,
                           ),
                           counterText: '',
                           filled: true,
-                          fillColor: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                          fillColor: AppColors.surfaceLight,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                             borderSide: BorderSide(
-                              color: isDark ? AppColors.gray700 : AppColors.gray300,
+                              color: AppColors.gray300,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                             borderSide: BorderSide(
-                              color: isDark ? AppColors.gray700 : AppColors.gray300,
+                              color: AppColors.gray300,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -468,12 +464,10 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                           vertical: AppSpacing.spacing3,
                         ),
                         decoration: BoxDecoration(
-                          color: isDark 
-                              ? AppColors.surfaceDark.withValues(alpha: 0.5)
-                              : AppColors.gray50,
+                          color: AppColors.gray50,
                           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
                           border: Border.all(
-                            color: isDark ? AppColors.gray700 : AppColors.gray200,
+                            color: AppColors.gray200,
                             width: 1,
                           ),
                         ),
@@ -485,14 +479,14 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                                 Icon(
                                   Icons.schedule_outlined,
                                   size: 16,
-                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  color: AppColors.textSecondaryLight,
                                 ),
                                 const SizedBox(width: AppSpacing.spacing2),
                                 Flexible(
                                   child: Text(
                                     'Vous n\'avez pas reçu le code ?',
                                     style: AppTypography.bodyMedium.copyWith(
-                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      color: AppColors.textSecondaryLight,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -563,7 +557,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                               const SizedBox(height: AppSpacing.spacing2),
                               LinearProgressIndicator(
                                 value: (60 - _remainingTime) / 60,
-                                backgroundColor: isDark ? AppColors.gray700 : AppColors.gray200,
+                                backgroundColor: AppColors.gray200,
                                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                                 minHeight: 2,
                               ),
@@ -593,7 +587,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                         children: [
                           Expanded(
                             child: Divider(
-                              color: isDark ? AppColors.gray700 : AppColors.gray300,
+                              color: AppColors.gray300,
                             ),
                           ),
                           Padding(
@@ -601,13 +595,13 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                             child: Text(
                               'ou',
                               style: AppTypography.bodyMedium.copyWith(
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                color: AppColors.textSecondaryLight,
                               ),
                             ),
                           ),
                           Expanded(
                             child: Divider(
-                              color: isDark ? AppColors.gray700 : AppColors.gray300,
+                              color: AppColors.gray300,
                             ),
                           ),
                         ],
@@ -635,7 +629,7 @@ class _TwoFactorAuthScreenState extends State<TwoFactorAuthScreen>
                         child: Text(
                           'Annuler',
                           style: AppTypography.bodyLarge.copyWith(
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: AppColors.textSecondaryLight,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
