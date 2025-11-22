@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 /// Basées sur la palette "Confiance & Sécurité" du contexte
 class AppColors {
   // Couleurs primaires
-  static const Color primary = Color(0xFF0066FF); // Bleu électrique
-  static const Color primaryDark = Color(0xFF0047B3);
+  static const Color primary = Color(0xFF0070A2); // Bleu principal
+  static const Color primaryDark = Color(0xFF005A85); // Bleu foncé
   static const Color secondary = Color(0xFF00D4AA); // Vert/turquoise - validation
   
   // Couleurs de fond

@@ -241,5 +241,22 @@ class ProfileService {
       return {'hasUsagePurpose': false, 'hasTermsAccepted': false};
     }
   }
+
+  /// Uploader une photo de profil
+  Future<void> uploadProfilePhoto(String imagePath) async {
+    try {
+      await _apiClient.postMultipart(
+        ApiConfig.updateProfilePhoto,
+        filePath: imagePath,
+        fileFieldName: 'photo',
+      );
+    } catch (e) {
+      print('Erreur uploadProfilePhoto: $e');
+      if (e is ApiException) {
+        throw AuthenticationException(e.message);
+      }
+      rethrow;
+    }
+  }
 }
 

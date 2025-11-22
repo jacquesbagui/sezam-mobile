@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sezam/core/theme/app_colors.dart';
 import 'package:sezam/core/theme/app_typography.dart';
 import 'package:sezam/core/theme/app_spacing.dart';
 import 'package:sezam/core/providers/auth_provider.dart';
 import 'package:sezam/core/providers/profile_provider.dart';
-import 'package:sezam/features/settings/settings_screen.dart';
+import 'package:sezam/core/services/profile_service.dart';
 import 'package:sezam/features/profile/edit_profile_field_screen.dart' show EditProfileFieldScreen, FieldType;
 
 class ProfileScreen extends StatefulWidget {
@@ -21,14 +22,13 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _notificationsEnabled = true;
-  late ScrollController _scrollController;
-  bool _isScrolled = false;
+  final ImagePicker _imagePicker = ImagePicker();
+  final ProfileService _profileService = ProfileService();
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
     
     // Charger le statut du profil et rafraîchir l'utilisateur (utiliser cache si disponible)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -41,60 +41,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.offset > 50 && !_isScrolled) {
-      setState(() {
-        _isScrolled = true;
-      });
-    } else if (_scrollController.offset <= 50 && _isScrolled) {
-      setState(() {
-        _isScrolled = false;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gray50,
       body: Column(
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              _buildCustomHeader(),
-              if (!_isScrolled)
-                Positioned(
-                  top: 160, // Position pour superposer sur le gradient
-                  left: AppSpacing.spacing4,
-                  right: AppSpacing.spacing4,
-                  child: _buildProfileSection(),
-                ),
-            ],
-          ),
+          _buildSimpleHeader(),
           Expanded(
             child: SingleChildScrollView(
-              controller: _scrollController,
               child: Column(
                 children: [
-                  if (_isScrolled) ...[
-                    const SizedBox(height: 20), // Petit espace depuis le gradient
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
-                      child: _buildProfileSection(),
-                    ),
-                    const SizedBox(height: AppSpacing.spacing6),
-                  ] else
-                    const SizedBox(height: 240), // Espace pour la carte superposée
+                  const SizedBox(height: AppSpacing.spacing4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
+                    child: _buildProfileSection(),
+                  ),
+                  const SizedBox(height: AppSpacing.spacing6),
                   _buildProfileProgressSection(),
-                  const SizedBox(height: AppSpacing.spacing6),
+                  const SizedBox(height: AppSpacing.spacing3),
                   _buildMissingFieldsSection(),
-                  const SizedBox(height: AppSpacing.spacing6),
+                  const SizedBox(height: AppSpacing.spacing3),
                   _buildPersonalInfoSection(),
                   const SizedBox(height: AppSpacing.spacing4),
                   _buildSecuritySection(),
@@ -116,39 +82,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildCustomHeader() {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      height: _isScrolled ? 120 : 200,
+  Widget _buildSimpleHeader() {
+    return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0066FF),
-            Color(0xFF0047B3),
+            AppColors.primary,
+            AppColors.primaryDark,
           ],
         ),
-        borderRadius: _isScrolled 
-          ? BorderRadius.zero 
-          : const BorderRadius.only(
-              bottomLeft: Radius.circular(AppSpacing.radius7xl),
-              bottomRight: Radius.circular(AppSpacing.radius7xl),
-            ),
       ),
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + (_isScrolled ? 0 : AppSpacing.spacing4),
-        left: AppSpacing.spacing6,
-        right: AppSpacing.spacing6,
-        bottom: _isScrolled ? 0 : AppSpacing.spacing4,
+        top: MediaQuery.of(context).padding.top + AppSpacing.spacing2,
+        bottom: AppSpacing.spacing4,
+        left: AppSpacing.spacing4,
+        right: AppSpacing.spacing4,
       ),
       child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              // Retourner en arrière
               if (widget.onBackToDashboard != null) {
                 widget.onBackToDashboard!();
               } else if (context.canPop()) {
@@ -168,111 +124,277 @@ class _ProfileScreenState extends State<ProfileScreen> {
               textAlign: TextAlign.center,
             ),
           ),
+          // Espace pour équilibrer avec le bouton retour
+          const SizedBox(width: 48),
         ],
       ),
     );
   }
 
   Widget _buildProfileSection() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            offset: const Offset(0, 4),
-            blurRadius: 12,
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                offset: const Offset(0, 2),
+                blurRadius: 8,
+              ),
+            ],
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(AppSpacing.spacing6),
-      child: Column(
-        children: [
-          _buildProfilePicture(),
-          const SizedBox(height: AppSpacing.spacing4),
-          _buildUserName(),
-          const SizedBox(height: AppSpacing.spacing2),
-          _buildEmail(),
-          const SizedBox(height: AppSpacing.spacing4),
-          _buildVerificationButton(),
-        ],
-      ),
+          padding: const EdgeInsets.all(AppSpacing.spacing6),
+          child: Column(
+            children: [
+              _buildProfilePicture(),
+              const SizedBox(height: AppSpacing.spacing4),
+              _buildUserName(),
+              const SizedBox(height: AppSpacing.spacing2),
+              _buildEmail(),
+              const SizedBox(height: AppSpacing.spacing4),
+              _buildVerificationButton(),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildProfilePicture() {
-    return Stack(
-      children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.gray200,
-              width: 2,
+    return SizedBox(
+      width: 90,
+      height: 90,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Photo de profil arrondie - Zone cliquable principale
+          Positioned(
+            top: 5,
+            left: 5,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _isUploadingPhoto ? null : _handleProfilePhotoTap,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.gray200,
+                    width: 2,
+                  ),
+                ),
+                child: _isUploadingPhoto
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        ),
+                      )
+                    : ClipOval(
+                        child: _buildProfileImage(),
+                      ),
+              ),
             ),
           ),
-          child: _buildProfileImage(),
-        ),
-        Positioned(
-          bottom: 0,
-          right: 0,
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.edit,
-              color: Colors.white,
-              size: 16,
+          // Bouton d'édition - Positionné en bas à droite avec Material pour élévation
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: _isUploadingPhoto,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 10,
+                shadowColor: Colors.black.withValues(alpha: 0.4),
+                child: InkWell(
+                  onTap: () {
+                    print('📸 Bouton d\'édition cliqué');
+                    _handleProfilePhotoTap();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  splashColor: Colors.white.withValues(alpha: 0.3),
+                  highlightColor: Colors.white.withValues(alpha: 0.1),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: _isUploadingPhoto
+                        ? const SizedBox.shrink()
+                        : const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+  
+  Future<void> _handleProfilePhotoTap() async {
+    if (_isUploadingPhoto) {
+      print('⚠️ Upload en cours, ignore le clic');
+      return;
+    }
+    
+    print('📸 _handleProfilePhotoTap appelé - Ouverture du menu');
+    
+    if (!mounted) return;
+    
+    // Afficher un dialogue pour choisir la source
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+              title: const Text('Prendre une photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
+              title: const Text('Choisir depuis la galerie'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.cancel, color: AppColors.error),
+              title: const Text('Annuler'),
+              onTap: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      // Sélectionner l'image
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Uploader la photo
+      setState(() {
+        _isUploadingPhoto = true;
+      });
+
+      await _profileService.uploadProfilePhoto(image.path);
+
+      // Rafraîchir l'utilisateur pour avoir la nouvelle photo
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshUser();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo de profil mise à jour avec succès'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'upload: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
+    }
   }
 
   Widget _buildProfileImage() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final user = authProvider.currentUser;
-    
-    if (user?.profileImage != null && user!.profileImage!.isNotEmpty) {
-      return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: user.profileImage!,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: AppColors.primary.withValues(alpha: 0.2),
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 40,
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.currentUser;
+        
+        // Récupérer l'URL de la photo depuis profile.profile_photo ou profileImage
+        final profilePhotoUrl = user?.profile?['profile_photo'] as String? ?? user?.profileImage;
+        
+        if (profilePhotoUrl != null && profilePhotoUrl.isNotEmpty) {
+          return CachedNetworkImage(
+            imageUrl: profilePhotoUrl,
+            fit: BoxFit.cover,
+            width: 100,
+            height: 100,
+            placeholder: (context, url) => Container(
+              width: 100,
+              height: 100,
+              color: AppColors.primary.withValues(alpha: 0.1),
+              child: const Icon(
+                Icons.person,
+                color: AppColors.primary,
+                size: 50,
+              ),
             ),
-          ),
-          errorWidget: (context, url, error) => Container(
+            errorWidget: (context, url, error) {
+              print('❌ Erreur chargement image: $error, URL: $url');
+              return Container(
+                width: 100,
+                height: 100,
+                color: AppColors.primary.withValues(alpha: 0.1),
+                child: const Icon(
+                  Icons.person,
+                  color: AppColors.primary,
+                  size: 50,
+                ),
+              );
+            },
+          );
+        }
+        
+        return Container(
+          width: 100,
+          height: 100,
+          color: AppColors.primary.withValues(alpha: 0.1),
+          child: const Icon(
+            Icons.person,
             color: AppColors.primary,
-            child: const Icon(
-              Icons.person,
-              color: Colors.white,
-              size: 40,
-            ),
+            size: 50,
           ),
-        ),
-      );
-    }
-    
-    return Container(
-      color: AppColors.primary,
-      child: const Icon(
-        Icons.person,
-        color: Colors.white,
-        size: 40,
-      ),
+        );
+      },
     );
   }
 
@@ -1144,15 +1266,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4),
       height: 1,
       color: AppColors.gray200,
-    );
-  }
-
-  void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const SettingsScreen(),
-      ),
     );
   }
 

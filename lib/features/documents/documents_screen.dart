@@ -47,10 +47,21 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             event == AppEventType.documentVerified ||
             event == AppEventType.documentRejected) {
           print('🔄 DocumentsScreen: Événement reçu - $event, rafraîchissement de la liste...');
-          final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
-          // Invalider le cache et forcer le rechargement
-          documentProvider.invalidateCache();
-          documentProvider.refresh();
+          
+          // Attendre un peu avant de rafraîchir pour éviter les problèmes de timing
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              try {
+                final documentProvider = Provider.of<DocumentProvider>(context, listen: false);
+                // Invalider le cache et forcer le rechargement
+                documentProvider.invalidateCache();
+                documentProvider.refresh();
+                print('✅ DocumentsScreen: Liste rafraîchie');
+              } catch (e) {
+                print('❌ DocumentsScreen: Erreur lors du rafraîchissement: $e');
+              }
+            }
+          });
         }
       }
     });
@@ -366,6 +377,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimaryLight,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                      softWrap: true,
                     ),
                     if (document.documentNumber != null && document.documentNumber!.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.spacing1),
@@ -374,6 +388,8 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                         style: AppTypography.bodySmall.copyWith(
                           color: AppColors.gray600,
                         ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ],
                     if (document.expiryDate != null) ...[

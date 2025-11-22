@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../config/api_config.dart';
 import '../models/api_response.dart';
 import 'token_storage_service.dart';
@@ -291,6 +292,76 @@ class ApiClient {
   /// Déconnexion
   Future<void> logout() async {
     await _tokenStorage.clearAll();
+  }
+
+  /// Méthode pour les requêtes POST multipart (upload de fichiers)
+  Future<ApiResponse<T>> postMultipart<T>(
+    String endpoint, {
+    required String filePath,
+    required String fileFieldName,
+    Map<String, String>? fields,
+    T Function(Map<String, dynamic>)? fromJson,
+  }) async {
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint');
+      final file = File(filePath);
+      
+      if (!await file.exists()) {
+        throw ApiException('Le fichier n\'existe pas: $filePath');
+      }
+
+      // Créer la requête multipart
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Déterminer le type MIME du fichier
+      final filePathParts = filePath.split('.');
+      final ext = filePathParts.length > 1 
+          ? filePathParts.last.toLowerCase() 
+          : 'jpg';
+      String mime = 'image/jpeg'; // Par défaut JPEG
+      if (ext == 'png') mime = 'image/png';
+      if (ext == 'pdf') mime = 'application/pdf';
+      
+      // Utiliser MultipartFile.fromPath() qui gère correctement le stream
+      final multipartFile = await http.MultipartFile.fromPath(
+        fileFieldName,
+        filePath,
+        contentType: MediaType.parse(mime),
+      );
+      request.files.add(multipartFile);
+      
+      // Ajouter les champs supplémentaires
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      
+      // Ajouter les headers (sans Content-Type, il sera défini automatiquement)
+      final headers = await _buildHeaders(null);
+      headers.remove('Content-Type'); // Important : laisser multipart définir le Content-Type
+      request.headers.addAll(headers);
+      
+      // Envoyer la requête
+      final streamedResponse = await request.send().timeout(
+        ApiConfig.receiveTimeout,
+        onTimeout: () {
+          throw ApiException('Délai d\'attente dépassé lors de l\'upload');
+        },
+      );
+      
+      // Convertir la réponse streamée en Response
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException catch (e) {
+      throw ApiException('Impossible de se connecter au serveur: ${e.message}');
+    } on HttpException catch (e) {
+      throw ApiException('Erreur HTTP: ${e.message}');
+    } on FormatException catch (e) {
+      throw ApiException('Erreur de format: ${e.message}');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('Erreur lors de l\'upload: ${e.toString()}');
+    }
   }
 }
 

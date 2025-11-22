@@ -630,7 +630,12 @@ class _DocumentUploadScreenState extends State<DocumentUploadScreen> {
     return Scaffold(
       backgroundColor: AppColors.gray50,
       appBar: AppBar(
-        title: Text(widget.documentTitle),
+        title: Text(
+          widget.documentTitle,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
+          softWrap: true,
+        ),
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -669,6 +674,9 @@ class _DocumentUploadScreenState extends State<DocumentUploadScreen> {
                           style: AppTypography.headline4.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
+                          overflow: TextOverflow.visible,
+                          softWrap: true,
+                          maxLines: null,
                         ),
                         SizedBox(height: AppSpacing.spacing1),
                         Text(

@@ -9,6 +9,7 @@ import 'package:sezam/core/theme/app_spacing.dart';
 import 'package:sezam/core/services/document_service.dart';
 import 'package:sezam/core/services/exceptions.dart';
 import 'package:sezam/core/services/api_client.dart';
+import 'package:sezam/core/services/app_event_service.dart';
 
 class AddDocumentScreen extends StatefulWidget {
   const AddDocumentScreen({super.key});
@@ -29,15 +30,11 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   String? _selectedDocumentTypeId;
   String _selectedDocumentTypeName = '';
   String _selectedSource = 'Camera';
-  File? _selectedFile;
+  List<File> _selectedFiles = [];
   DateTime? _expiryDate;
   bool _isUploading = false;
 
-  final List<String> _sourceTypes = [
-    'Camera',
-    'Galerie',
-    'Fichier',
-  ];
+  final List<String> _sourceTypes = ['Camera', 'Galerie', 'Fichier'];
 
   @override
   void dispose() {
@@ -50,46 +47,41 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gray50,
-      body: RepaintBoundary(
-        child: CustomScrollView(
-          slivers: [
-            _buildSliverAppBar(),
-            SliverToBoxAdapter(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    RepaintBoundary(child: _buildDocumentPreview()),
-                    const SizedBox(height: AppSpacing.spacing4),
-                    RepaintBoundary(
-                      child: _DocumentTypeSelector(
-                        documentService: _documentService,
-                        selectedTypeId: _selectedDocumentTypeId,
-                        onTypeSelected: (typeId, typeName) {
-                          setState(() {
-                            _selectedDocumentTypeId = typeId;
-                            _selectedDocumentTypeName = typeName;
-                          });
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacing4),
-                    RepaintBoundary(child: _buildDocumentInfoSection()),
-                    const SizedBox(height: AppSpacing.spacing4),
-                    RepaintBoundary(child: _buildSourceSection()),
-                    const SizedBox(height: AppSpacing.spacing8),
-                    RepaintBoundary(child: _buildActionButtons()),
-                    const SizedBox(height: AppSpacing.spacing8),
-                  ],
-                ),
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(),
+          SliverToBoxAdapter(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  _buildDocumentPreview(),
+                  const SizedBox(height: AppSpacing.spacing4),
+                  _DocumentTypeSelector(
+                    documentService: _documentService,
+                    selectedTypeId: _selectedDocumentTypeId,
+                    onTypeSelected: (typeId, typeName) {
+                      setState(() {
+                        _selectedDocumentTypeId = typeId;
+                        _selectedDocumentTypeName = typeName;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.spacing4),
+                  _buildDocumentInfoSection(),
+                  const SizedBox(height: AppSpacing.spacing4),
+                  _buildSourceSection(),
+                  const SizedBox(height: AppSpacing.spacing8),
+                  _buildActionButtons(),
+                  const SizedBox(height: AppSpacing.spacing8),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-
 
   /// AppBar avec effet de parallaxe
   Widget _buildSliverAppBar() {
@@ -101,11 +93,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
       elevation: 0,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () {
-          if (Navigator.canPop(context)) {
-            Navigator.pop(context);
-          }
-        },
+        onPressed: () => Navigator.pop(context),
       ),
       centerTitle: true,
       flexibleSpace: FlexibleSpaceBar(
@@ -136,7 +124,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                         color: AppColors.primary.withValues(alpha: 0.2),
                         offset: const Offset(0, 4),
                         blurRadius: 12,
-                        spreadRadius: 0,
                       ),
                     ],
                   ),
@@ -165,7 +152,10 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   /// Aperçu du document
   Widget _buildDocumentPreview() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing4, vertical: AppSpacing.spacing4),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.spacing4,
+        vertical: AppSpacing.spacing4,
+      ),
       padding: const EdgeInsets.all(AppSpacing.spacing4),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -175,19 +165,15 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             color: Colors.black.withValues(alpha: 0.08),
             offset: const Offset(0, 2),
             blurRadius: 8,
-            spreadRadius: 0,
           ),
         ],
       ),
       child: Column(
         children: [
-          // Aperçu du fichier si sélectionné
-          if (_selectedFile != null) ...[
-            _buildFilePreview(),
+          if (_selectedFiles.isNotEmpty) ...[
+            _buildFilesPreview(),
             const SizedBox(height: AppSpacing.spacing4),
           ],
-          
-          // Informations du document
           Row(
             children: [
               Container(
@@ -209,8 +195,8 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _selectedDocumentTypeName.isNotEmpty 
-                          ? _selectedDocumentTypeName 
+                      _selectedDocumentTypeName.isNotEmpty
+                          ? _selectedDocumentTypeName
                           : 'Sélectionnez un type',
                       style: AppTypography.bodyLarge.copyWith(
                         fontWeight: FontWeight.w600,
@@ -219,12 +205,14 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
                     ),
                     const SizedBox(height: AppSpacing.spacing1),
                     Text(
-                      _selectedFile != null 
-                          ? 'Fichier sélectionné' 
-                          : 'Aucun fichier sélectionné',
+                      _selectedFiles.isEmpty
+                          ? 'Aucun fichier sélectionné'
+                          : _selectedFiles.length == 1
+                              ? '1 fichier sélectionné'
+                              : '${_selectedFiles.length} fichiers sélectionnés',
                       style: AppTypography.bodySmall.copyWith(
-                        color: _selectedFile != null 
-                            ? AppColors.success 
+                        color: _selectedFiles.isNotEmpty
+                            ? AppColors.success
                             : AppColors.textSecondaryLight,
                       ),
                     ),
@@ -238,60 +226,223 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     );
   }
 
-  /// Aperçu du fichier sélectionné
-  Widget _buildFilePreview() {
-    final isImage = _selectedFile!.path.toLowerCase().endsWith('.jpg') ||
-                    _selectedFile!.path.toLowerCase().endsWith('.jpeg') ||
-                    _selectedFile!.path.toLowerCase().endsWith('.png');
+  /// Aperçu des fichiers sélectionnés
+  Widget _buildFilesPreview() {
+    if (_selectedFiles.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_selectedFiles.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.spacing2),
+            child: Text(
+              '${_selectedFiles.length} fichiers sélectionnés',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.gray600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        // Si un seul fichier, utiliser un widget fixe au lieu d'un ListView
+        _selectedFiles.length == 1
+            ? ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxHeight: 200,
+                  minHeight: 150,
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: _buildFilePreviewCard(_selectedFiles[0], 0),
+                ),
+              )
+            : SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedFiles.length,
+                  itemBuilder: (context, index) {
+                    return _buildFilePreviewCard(_selectedFiles[index], index);
+                  },
+                ),
+              ),
+      ],
+    );
+  }
+
+  /// Carte d'aperçu d'un fichier
+  Widget _buildFilePreviewCard(File file, int index) {
+    final isImage = _isImageFile(file);
+    // Utiliser une largeur fixe pour éviter les problèmes avec ListView
+    final cardWidth = _selectedFiles.length == 1 
+        ? null // null signifie qu'on utilise toute la largeur disponible (dans un SizedBox)
+        : 150.0;
     
     return Container(
-      height: 200,
-      width: double.infinity,
+      width: cardWidth,
+      margin: EdgeInsets.only(
+        right: index < _selectedFiles.length - 1 ? AppSpacing.spacing2 : 0,
+      ),
       decoration: BoxDecoration(
         color: AppColors.gray50,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(color: AppColors.gray300),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-        child: isImage
-            ? Image.file(
-                _selectedFile!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildFileIcon();
-                },
-              )
-            : _buildFileIcon(),
-      ),
-    );
-  }
-
-  Widget _buildFileIcon() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
         children: [
-          Icon(
-            Icons.insert_drive_file,
-            size: 64,
-            color: AppColors.gray400,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+            child: isImage
+                ? _buildImageThumbnail(file)
+                : _buildFileIcon(file),
           ),
-          const SizedBox(height: AppSpacing.spacing2),
-          Text(
-            _selectedFile!.path.split('/').last,
-            style: AppTypography.bodySmall.copyWith(
-              color: AppColors.gray600,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          Positioned(
+            top: AppSpacing.spacing1,
+            right: AppSpacing.spacing1,
+            child: _buildRemoveButton(index),
           ),
         ],
       ),
     );
   }
 
+  /// Vérifier si le fichier est une image
+  bool _isImageFile(File file) {
+    final path = file.path.toLowerCase();
+    return path.endsWith('.jpg') ||
+        path.endsWith('.jpeg') ||
+        path.endsWith('.png');
+  }
+
+  /// Miniature d'image sécurisée
+  Widget _buildImageThumbnail(File file) {
+    return FutureBuilder<bool>(
+      future: _checkFileExists(file),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingPlaceholder();
+        }
+
+        if (!snapshot.hasData || !snapshot.data!) {
+          return _buildFileIcon(file);
+        }
+
+        return _buildImageWidget(file);
+      },
+    );
+  }
+
+  /// Vérifier l'existence du fichier de manière asynchrone
+  Future<bool> _checkFileExists(File file) async {
+    try {
+      return await file.exists();
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Widget d'image avec gestion d'erreur
+  Widget _buildImageWidget(File file) {
+    return Image.file(
+      file,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (context, error, stackTrace) => _buildFileIcon(file),
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (frame == null && !wasSynchronouslyLoaded) {
+          return _buildLoadingPlaceholder();
+        }
+        return child;
+      },
+      cacheWidth: 300,
+      cacheHeight: 300,
+      filterQuality: FilterQuality.low,
+    );
+  }
+
+  /// Placeholder de chargement
+  Widget _buildLoadingPlaceholder() {
+    return Container(
+      color: AppColors.gray100,
+      child: const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+
+  /// Icône de fichier
+  Widget _buildFileIcon(File file) {
+    return Container(
+      color: AppColors.gray100,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.insert_drive_file,
+              size: 48,
+              color: AppColors.gray400,
+            ),
+            const SizedBox(height: AppSpacing.spacing1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2),
+              child: Text(
+                _getFileName(file),
+                style: AppTypography.bodySmall.copyWith(
+                  color: AppColors.gray600,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Obtenir le nom du fichier
+  String _getFileName(File file) {
+    return file.path.split('/').last;
+  }
+
+  /// Bouton de suppression
+  Widget _buildRemoveButton(int index) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedFiles.removeAt(index);
+          });
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.spacing1),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 4,
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.close,
+            color: AppColors.error,
+            size: 16,
+          ),
+        ),
+      ),
+    );
+  }
 
   /// Section informations du document
   Widget _buildDocumentInfoSection() {
@@ -306,7 +457,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 2),
             blurRadius: 8,
-            spreadRadius: 0,
           ),
         ],
       ),
@@ -315,11 +465,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.info_outline,
-                color: AppColors.primary,
-                size: 20,
-              ),
+              Icon(Icons.info_outline, color: AppColors.primary, size: 20),
               const SizedBox(width: AppSpacing.spacing2),
               Text(
                 'Informations du document',
@@ -331,8 +477,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.spacing4),
-          
-          // Numéro du document (optionnel)
           _buildInputField(
             controller: _documentNumberController,
             label: 'Numéro du document (optionnel)',
@@ -340,8 +484,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             icon: Icons.badge_outlined,
           ),
           const SizedBox(height: AppSpacing.spacing4),
-          
-          // Date d'expiration (optionnel)
           _buildDateField(),
         ],
       ),
@@ -361,7 +503,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 2),
             blurRadius: 8,
-            spreadRadius: 0,
           ),
         ],
       ),
@@ -370,11 +511,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.source,
-                color: AppColors.primary,
-                size: 20,
-              ),
+              Icon(Icons.source, color: AppColors.primary, size: 20),
               const SizedBox(width: AppSpacing.spacing2),
               Text(
                 'Source du document',
@@ -386,12 +523,8 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.spacing3),
-          
-          // Sélection de la source
           _buildSourceSelector(),
           const SizedBox(height: AppSpacing.spacing4),
-          
-          // Zone de capture/upload
           _buildCaptureZone(),
         ],
       ),
@@ -402,94 +535,128 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
   Widget _buildCaptureZone() {
     return Container(
       width: double.infinity,
-      height: _selectedFile != null ? 200 : 160,
+      constraints: const BoxConstraints(minHeight: 160),
       decoration: BoxDecoration(
         color: AppColors.gray50,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
-          color: _selectedFile != null 
-              ? AppColors.success 
+          color: _selectedFiles.isNotEmpty
+              ? AppColors.success
               : AppColors.gray300,
-          style: BorderStyle.solid,
           width: 2,
         ),
       ),
-      child: _selectedFile != null
-          ? Stack(
-              children: [
-                _buildFilePreview(),
-                Positioned(
-                  top: AppSpacing.spacing2,
-                  right: AppSpacing.spacing2,
-                  child: IconButton(
-                    icon: Container(
-                      padding: const EdgeInsets.all(AppSpacing.spacing1),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: AppColors.error,
-                        size: 20,
+      child: _selectedFiles.isNotEmpty
+          ? Padding(
+              padding: const EdgeInsets.all(AppSpacing.spacing2),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Afficher seulement un message et le bouton pour ajouter plus de fichiers
+                  // Les fichiers sont déjà affichés dans _buildDocumentPreview()
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.spacing3),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(
+                        color: AppColors.success.withValues(alpha: 0.3),
                       ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _selectedFile = null;
-                      });
-                    },
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: AppColors.success,
+                          size: 20,
+                        ),
+                        const SizedBox(width: AppSpacing.spacing2),
+                        Expanded(
+                          child: Text(
+                            _selectedFiles.length == 1
+                                ? '1 fichier sélectionné'
+                                : '${_selectedFiles.length} fichiers sélectionnés',
+                            style: AppTypography.bodySmall.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.spacing2),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _handleDocumentCapture,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Ajouter un autre fichier'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: BorderSide(color: AppColors.primary),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             )
           : InkWell(
               onTap: _handleDocumentCapture,
               borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: _getSourceIcon(_selectedSource) == Icons.camera_alt 
-                          ? AppColors.primary.withValues(alpha: 0.1)
-                          : AppColors.secondary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 160),
+                padding: const EdgeInsets.all(AppSpacing.spacing4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: _getSourceIcon(_selectedSource) == Icons.camera_alt
+                            ? AppColors.primary.withValues(alpha: 0.1)
+                            : AppColors.secondary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                      ),
+                      child: Icon(
+                        _getSourceIcon(_selectedSource),
+                        size: 30,
+                        color: _getSourceIcon(_selectedSource) == Icons.camera_alt
+                            ? AppColors.primary
+                            : AppColors.secondary,
+                      ),
                     ),
-                    child: Icon(
-                      _getSourceIcon(_selectedSource),
-                      size: 30,
-                      color: _getSourceIcon(_selectedSource) == Icons.camera_alt 
-                          ? AppColors.primary
-                          : AppColors.secondary,
+                    const SizedBox(height: AppSpacing.spacing3),
+                    Text(
+                      _getCaptureText(),
+                      style: AppTypography.bodyMedium.copyWith(
+                        color: AppColors.gray700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.spacing3),
-                  Text(
-                    _getCaptureText(),
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.gray700,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: AppSpacing.spacing1),
+                    Text(
+                      'Appuyez pour ${_getActionText()}',
+                      style: AppTypography.bodySmall.copyWith(
+                        color: AppColors.gray500,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppSpacing.spacing1),
-                  Text(
-                    'Appuyez pour ${_getActionText()}',
-                    style: AppTypography.bodySmall.copyWith(
-                      color: AppColors.gray500,
+                    const SizedBox(height: AppSpacing.spacing2),
+                    Text(
+                      'Vous pouvez ajouter plusieurs fichiers',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.gray500,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
     );
@@ -503,11 +670,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: _isUploading ? null : () {
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
+              onPressed: _isUploading ? null : () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.gray600,
                 side: BorderSide(color: AppColors.gray300),
@@ -523,7 +686,9 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           Expanded(
             flex: 2,
             child: ElevatedButton(
-              onPressed: (_isUploading || _selectedFile == null) ? null : _submitDocument,
+              onPressed: (_isUploading || _selectedFiles.isEmpty)
+                  ? null
+                  : _submitDocument,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -548,26 +713,6 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         ],
       ),
     );
-  }
-
-  /// Obtenir l'icône du type de document pour le dropdown
-  IconData _getDocumentTypeIconForName(String name) {
-    final lowerName = name.toLowerCase();
-    if (lowerName.contains('identité') || lowerName.contains('cni') || lowerName.contains('id_card')) {
-      return Icons.credit_card;
-    } else if (lowerName.contains('passeport') || lowerName.contains('passport')) {
-      return Icons.description;
-    } else if (lowerName.contains('permis') || lowerName.contains('licence') || lowerName.contains('driving')) {
-      return Icons.drive_eta;
-    } else if (lowerName.contains('domicile') || lowerName.contains('address') || lowerName.contains('proof')) {
-      return Icons.home;
-    } else if (lowerName.contains('naissance') || lowerName.contains('birth')) {
-      return Icons.child_care;
-    } else if (lowerName.contains('diplôme') || lowerName.contains('diploma')) {
-      return Icons.school;
-    } else {
-      return Icons.description;
-    }
   }
 
   /// Champ de saisie personnalisé
@@ -595,10 +740,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: BorderSide(color: AppColors.primary),
         ),
-        prefixIcon: Icon(
-          icon,
-          color: AppColors.gray500,
-        ),
+        prefixIcon: Icon(icon, color: AppColors.gray500),
         filled: true,
         fillColor: AppColors.gray50,
         contentPadding: const EdgeInsets.symmetric(
@@ -629,15 +771,9 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           borderSide: BorderSide(color: AppColors.primary),
         ),
-        prefixIcon: Icon(
-          Icons.calendar_today,
-          color: AppColors.gray500,
-        ),
+        prefixIcon: Icon(Icons.calendar_today, color: AppColors.gray500),
         suffixIcon: IconButton(
-          icon: Icon(
-            Icons.event,
-            color: AppColors.gray500,
-          ),
+          icon: Icon(Icons.event, color: AppColors.gray500),
           onPressed: _selectExpirationDate,
         ),
         filled: true,
@@ -665,11 +801,7 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
           final isSelected = _selectedSource == source;
           return Expanded(
             child: InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedSource = source;
-                });
-              },
+              onTap: () => setState(() => _selectedSource = source),
               borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -706,29 +838,380 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
     );
   }
 
+  /// Gérer la capture du document
+  Future<void> _handleDocumentCapture() async {
+    if (!mounted) return;
+
+    HapticFeedback.lightImpact();
+
+    try {
+      List<File> newFiles = [];
+
+      switch (_selectedSource) {
+        case 'Camera':
+          final file = await _takePhoto();
+          if (file != null) newFiles = [file];
+          break;
+        case 'Galerie':
+          newFiles = await _pickImagesFromGallery();
+          break;
+        case 'Fichier':
+          newFiles = await _pickFiles();
+          break;
+      }
+
+      if (newFiles.isNotEmpty && mounted) {
+        // Attendre un peu pour que les fichiers soient prêts
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        if (!mounted) return;
+
+        setState(() {
+          _selectedFiles.addAll(newFiles);
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                newFiles.length == 1
+                    ? 'Fichier ajouté: ${_getFileName(newFiles.first)}'
+                    : '${newFiles.length} fichiers ajoutés',
+              ),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Prendre une photo
+  Future<File?> _takePhoto() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        // Attendre que le fichier soit complètement écrit
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (await file.exists()) {
+          return file;
+        }
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Erreur lors de la prise de photo: $e');
+    }
+  }
+
+  /// Sélectionner plusieurs images depuis la galerie
+  Future<List<File>> _pickImagesFromGallery() async {
+    try {
+      final List<XFile> images = await _imagePicker.pickMultiImage(
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
+      );
+      return images.map((xFile) => File(xFile.path)).toList();
+    } catch (e) {
+      throw Exception('Erreur lors de la sélection depuis la galerie: $e');
+    }
+  }
+
+  /// Sélectionner plusieurs fichiers
+  Future<List<File>> _pickFiles() async {
+    try {
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowMultiple: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        return result.files
+            .where((file) => file.path != null)
+            .map((file) => File(file.path!))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Erreur lors de la sélection des fichiers: $e');
+    }
+  }
+
+  /// Soumettre le document
+  Future<void> _submitDocument() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedFiles.isEmpty) {
+      _showError('Veuillez sélectionner au moins un fichier');
+      return;
+    }
+
+    if (_selectedDocumentTypeId == null) {
+      _showError('Veuillez sélectionner un type de document');
+      return;
+    }
+
+    // Vérifier que l'ID est un UUID valide
+    if (_selectedDocumentTypeId!.length < 30 ||
+        !_selectedDocumentTypeId!.contains('-')) {
+      _showError('Type de document invalide. Veuillez réessayer.');
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+
+    setState(() => _isUploading = true);
+
+    // Afficher le dialog de chargement
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: AppSpacing.spacing4),
+              Text(
+                _selectedFiles.length == 1
+                    ? 'Upload du document en cours...'
+                    : 'Upload de ${_selectedFiles.length} documents en cours...',
+                style: AppTypography.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      int successCount = 0;
+      int failureCount = 0;
+
+      // Uploader chaque fichier
+      for (int i = 0; i < _selectedFiles.length; i++) {
+        if (!mounted) break;
+
+        final file = _selectedFiles[i];
+
+        try {
+          if (!await file.exists()) {
+            throw Exception('Fichier introuvable: ${_getFileName(file)}');
+          }
+
+          await _documentService.uploadDocument(
+            documentTypeId: _selectedDocumentTypeId!,
+            filePath: file.path,
+            documentNumber: _documentNumberController.text.isNotEmpty && i == 0
+                ? _documentNumberController.text
+                : null,
+            expiryDate: i == 0 ? _expiryDate : null,
+          );
+
+          successCount++;
+        } catch (e) {
+          failureCount++;
+        }
+
+        // Pause entre les uploads
+        if (i < _selectedFiles.length - 1 && mounted) {
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      }
+
+      // Fermer le dialog
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Attendre un peu
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      if (!mounted) return;
+
+      setState(() => _isUploading = false);
+
+      // Retourner à la liste
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // Émettre l'événement après un délai
+      if (successCount > 0) {
+        await Future.delayed(const Duration(milliseconds: 1000));
+        AppEventService.instance.emit(AppEventType.documentUploaded);
+      }
+
+      // Afficher le message de résultat
+      if (mounted) {
+        final message = failureCount == 0
+            ? (successCount == 1
+                ? 'Document ajouté avec succès'
+                : '$successCount documents ajoutés avec succès')
+            : (successCount > 0
+                ? '$successCount document(s) ajouté(s), $failureCount échec(s)'
+                : 'Erreur lors de l\'upload');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: failureCount == 0
+                ? AppColors.success
+                : (successCount > 0 ? AppColors.warning : AppColors.error),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      // Fermer le dialog
+      if (mounted) {
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() => _isUploading = false);
+
+        String errorMsg = 'Erreur lors de l\'upload';
+        if (e is AuthenticationException) {
+          errorMsg = e.message;
+        } else if (e is ApiException) {
+          errorMsg = e.message;
+        } else {
+          errorMsg = e.toString();
+        }
+
+        _showError(errorMsg);
+      }
+    }
+  }
+
+  /// Afficher une erreur
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  /// Sélectionner la date d'expiration
+  Future<void> _selectExpirationDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 3650)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Colors.black,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _expiryDate = picked;
+        _expirationDateController.text =
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
+    }
+  }
+
   /// Obtenir l'icône du type de document
   IconData _getDocumentTypeIcon() {
     return _getDocumentTypeIconForName(_selectedDocumentTypeName);
   }
 
+  /// Obtenir l'icône du type de document pour le dropdown
+  IconData _getDocumentTypeIconForName(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('identité') ||
+        lowerName.contains('cni') ||
+        lowerName.contains('id_card')) {
+      return Icons.credit_card;
+    } else if (lowerName.contains('passeport') ||
+        lowerName.contains('passport')) {
+      return Icons.description;
+    } else if (lowerName.contains('permis') ||
+        lowerName.contains('licence') ||
+        lowerName.contains('driving')) {
+      return Icons.drive_eta;
+    } else if (lowerName.contains('domicile') ||
+        lowerName.contains('address') ||
+        lowerName.contains('proof')) {
+      return Icons.home;
+    } else if (lowerName.contains('naissance') ||
+        lowerName.contains('birth')) {
+      return Icons.child_care;
+    } else if (lowerName.contains('diplôme') ||
+        lowerName.contains('diploma')) {
+      return Icons.school;
+    }
+    return Icons.description;
+  }
+
   /// Obtenir la couleur du type de document
   Color _getDocumentTypeColor() {
     final lowerName = _selectedDocumentTypeName.toLowerCase();
-    if (lowerName.contains('identité') || lowerName.contains('cni') || lowerName.contains('id_card')) {
+    if (lowerName.contains('identité') ||
+        lowerName.contains('cni') ||
+        lowerName.contains('id_card')) {
       return const Color(0xFF4CAF50);
-    } else if (lowerName.contains('passeport') || lowerName.contains('passport')) {
+    } else if (lowerName.contains('passeport') ||
+        lowerName.contains('passport')) {
       return const Color(0xFF2196F3);
-    } else if (lowerName.contains('permis') || lowerName.contains('licence') || lowerName.contains('driving')) {
+    } else if (lowerName.contains('permis') ||
+        lowerName.contains('licence') ||
+        lowerName.contains('driving')) {
       return const Color(0xFFFF9800);
-    } else if (lowerName.contains('domicile') || lowerName.contains('address') || lowerName.contains('proof')) {
+    } else if (lowerName.contains('domicile') ||
+        lowerName.contains('address') ||
+        lowerName.contains('proof')) {
       return const Color(0xFF9C27B0);
-    } else if (lowerName.contains('naissance') || lowerName.contains('birth')) {
+    } else if (lowerName.contains('naissance') ||
+        lowerName.contains('birth')) {
       return const Color(0xFFE91E63);
-    } else if (lowerName.contains('diplôme') || lowerName.contains('diploma')) {
+    } else if (lowerName.contains('diplôme') ||
+        lowerName.contains('diploma')) {
       return const Color(0xFF795548);
-    } else {
-      return AppColors.primary;
     }
+    return AppColors.primary;
   }
 
   /// Obtenir l'icône de la source
@@ -772,285 +1255,9 @@ class _AddDocumentScreenState extends State<AddDocumentScreen> {
         return 'prendre une photo';
     }
   }
-
-  /// Sélectionner la date d'expiration
-  Future<void> _selectExpirationDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _expiryDate ?? DateTime.now().add(const Duration(days: 365)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 3650)), // 10 ans
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-    
-    if (picked != null) {
-      setState(() {
-        _expiryDate = picked;
-        _expirationDateController.text = 
-            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
-      });
-    }
-  }
-
-  /// Gérer la capture du document
-  Future<void> _handleDocumentCapture() async {
-    HapticFeedback.lightImpact();
-    
-    try {
-      File? file;
-      
-      switch (_selectedSource) {
-        case 'Camera':
-          file = await _takePhoto();
-          break;
-        case 'Galerie':
-          file = await _pickImageFromGallery();
-          break;
-        case 'Fichier':
-          file = await _pickFile();
-          break;
-      }
-      
-      if (file != null && mounted) {
-        setState(() {
-          _selectedFile = file;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fichier sélectionné: ${file.path.split('/').last}'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  /// Prendre une photo
-  Future<File?> _takePhoto() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 2048,
-        maxHeight: 2048,
-        imageQuality: 90,
-      );
-      
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Erreur lors de la prise de photo: $e');
-    }
-  }
-
-  /// Sélectionner une image depuis la galerie
-  Future<File?> _pickImageFromGallery() async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 2048,
-        maxHeight: 2048,
-        imageQuality: 90,
-      );
-      
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Erreur lors de la sélection depuis la galerie: $e');
-    }
-  }
-
-  /// Sélectionner un fichier
-  Future<File?> _pickFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-        allowMultiple: false,
-      );
-      
-      if (result != null && result.files.single.path != null) {
-        return File(result.files.single.path!);
-      }
-      return null;
-    } catch (e) {
-      throw Exception('Erreur lors de la sélection du fichier: $e');
-    }
-  }
-
-  /// Soumettre le document
-  Future<void> _submitDocument() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    
-    if (_selectedFile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un fichier'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-    
-    if (_selectedDocumentTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un type de document'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-    
-    HapticFeedback.mediumImpact();
-    
-    setState(() {
-      _isUploading = true;
-    });
-    
-    // Afficher un dialog de chargement et stocker son contexte
-    BuildContext? dialogContext;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogBuildContext) {
-        dialogContext = dialogBuildContext;
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: AppSpacing.spacing4),
-                Text(
-                  'Upload du document en cours...',
-                  style: AppTypography.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    
-    try {
-      final uploadedDocument = await _documentService.uploadDocument(
-        documentTypeId: _selectedDocumentTypeId!,
-        filePath: _selectedFile!.path,
-        documentNumber: _documentNumberController.text.isNotEmpty 
-            ? _documentNumberController.text 
-            : null,
-        expiryDate: _expiryDate,
-      );
-      
-      // Fermer le dialog de chargement AVANT les opérations asynchrones
-      // Utiliser rootNavigator pour s'assurer de fermer le dialog
-      if (mounted) {
-        try {
-          Navigator.of(context, rootNavigator: true).pop();
-        } catch (e) {
-          // Si la fermeture échoue, essayer avec le contexte du dialog
-          try {
-            if (dialogContext != null) {
-              Navigator.of(dialogContext!, rootNavigator: true).pop();
-            }
-          } catch (e2) {
-            // Ignorer si le dialog n'existe plus
-            debugPrint('Erreur lors de la fermeture du dialog: $e2');
-          }
-        }
-      }
-      
-      // Rafraîchir directement les documents après upload (sans événement)
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-        
-        // Retourner à la liste des documents
-        Navigator.pop(context);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Document ${uploadedDocument.displayName} ajouté avec succès'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'Voir',
-              textColor: Colors.white,
-              onPressed: () {
-                // TODO: Naviguer vers le document ajouté si nécessaire
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      // Fermer le dialog de chargement en cas d'erreur
-      if (mounted) {
-        // Essayer de fermer le dialog s'il existe encore
-        try {
-          Navigator.of(context, rootNavigator: true).pop();
-        } catch (_) {
-          // Le dialog n'existe peut-être plus, ignorer l'erreur
-        }
-        
-        setState(() {
-          _isUploading = false;
-        });
-        
-        String errorMessage = 'Erreur lors de l\'upload du document';
-        if (e is AuthenticationException) {
-          errorMessage = e.message;
-        } else if (e is ApiException) {
-          errorMessage = e.message;
-        } else {
-          errorMessage = e.toString();
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    }
-  }
 }
 
 /// Widget séparé pour le sélecteur de type de document
-/// Utilise une liste statique de types avec mapping vers les IDs réels de l'API
 class _DocumentTypeSelector extends StatefulWidget {
   final DocumentService documentService;
   final String? selectedTypeId;
@@ -1067,12 +1274,11 @@ class _DocumentTypeSelector extends StatefulWidget {
 }
 
 class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
-  /// Liste statique des types de documents (noms pour l'affichage)
   static const List<_StaticDocumentType> _staticDocumentTypes = [
     _StaticDocumentType(
-      name: 'id_card',
+      name: 'identity_card',
       displayName: 'Carte d\'Identité',
-      description: 'Carte nationale d\'identité',
+      description: 'Carte nationale d\'identité (CNI)',
     ),
     _StaticDocumentType(
       name: 'passport',
@@ -1106,53 +1312,63 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
   @override
   void initState() {
     super.initState();
-    // Charger le mapping des IDs une seule fois
     _typeIdMappingFuture = _loadTypeIdMapping();
   }
 
-  /// Charger les IDs réels depuis l'API et les mapper avec les noms statiques
   Future<Map<String, String>> _loadTypeIdMapping() async {
     try {
       final rawDocs = await widget.documentService.getRequiredDocuments();
-      
       final mapping = <String, String>{};
-      
+
       for (final doc in rawDocs) {
         try {
           final id = doc['id']?.toString();
           final name = doc['name']?.toString();
-          
-          if (id != null && name != null && id.isNotEmpty && name.isNotEmpty) {
+
+          if (id != null &&
+              name != null &&
+              id.isNotEmpty &&
+              name.isNotEmpty) {
             mapping[name] = id;
           }
         } catch (e) {
           continue;
         }
       }
-      
+
       return mapping;
     } catch (e) {
-      // En cas d'erreur, retourner un mapping vide
-      // Les types statiques seront utilisés avec leurs noms comme fallback
       return {};
     }
   }
 
-  /// Obtenir la liste des types de documents avec leurs IDs réels
   Future<List<_DocumentType>> _getDocumentTypes() async {
     final mapping = await _typeIdMappingFuture;
-    
-    return _staticDocumentTypes.map((staticType) {
-      // Utiliser l'ID réel de l'API si disponible, sinon utiliser le nom comme fallback
-      final realId = mapping[staticType.name] ?? staticType.name;
-      
-      return _DocumentType(
-        id: realId,
-        name: staticType.name,
-        displayName: staticType.displayName,
-        description: staticType.description ?? '',
-      );
-    }).toList();
+    final Map<String, _DocumentType> uniqueTypes = {};
+
+    for (final staticType in _staticDocumentTypes) {
+      String? realId = mapping[staticType.name];
+
+      if (realId == null && staticType.name == 'identity_card') {
+        realId = mapping['id_card'];
+      }
+
+      if (realId != null &&
+          realId.length >= 30 &&
+          realId.contains('-') &&
+          realId != staticType.name) {
+        if (!uniqueTypes.containsKey(realId)) {
+          uniqueTypes[realId] = _DocumentType(
+            id: realId,
+            name: staticType.name,
+            displayName: staticType.displayName,
+            description: staticType.description ?? '',
+          );
+        }
+      }
+    }
+
+    return uniqueTypes.values.toList();
   }
 
   IconData _getDocumentTypeIcon(String name) {
@@ -1171,7 +1387,6 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
     return Icons.description_outlined;
   }
 
-  /// Afficher le bottom sheet pour sélectionner le type de document
   void _showDocumentTypeSheet(
     BuildContext context,
     List<_DocumentType> documentTypes,
@@ -1205,7 +1420,6 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
             color: Colors.black.withValues(alpha: 0.05),
             offset: const Offset(0, 2),
             blurRadius: 8,
-            spreadRadius: 0,
           ),
         ],
       ),
@@ -1214,11 +1428,7 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.category,
-                color: AppColors.primary,
-                size: 20,
-              ),
+              Icon(Icons.category, color: AppColors.primary, size: 20),
               const SizedBox(width: AppSpacing.spacing2),
               Text(
                 'Type de document',
@@ -1233,18 +1443,16 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
           FutureBuilder<List<_DocumentType>>(
             future: _getDocumentTypes(),
             builder: (context, snapshot) {
-              // État de chargement
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const SizedBox(
                   height: 50,
-                  child: Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  child: Center(child: CircularProgressIndicator()),
                 );
               }
 
-              // Erreur ou liste vide
-              if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+              if (snapshot.hasError ||
+                  !snapshot.hasData ||
+                  snapshot.data!.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(AppSpacing.spacing4),
                   decoration: BoxDecoration(
@@ -1256,15 +1464,12 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: AppColors.warning,
-                        size: 20,
-                      ),
+                      Icon(Icons.info_outline,
+                          color: AppColors.warning, size: 20),
                       const SizedBox(width: AppSpacing.spacing2),
                       Expanded(
                         child: Text(
-                          'Erreur lors du chargement des types',
+                          'Impossible de charger les types de documents',
                           style: AppTypography.bodySmall.copyWith(
                             color: AppColors.warning,
                           ),
@@ -1275,10 +1480,7 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
                 );
               }
 
-              // Données chargées avec succès
               final documentTypes = snapshot.data!;
-              
-              // Trouver le type sélectionné
               final selectedType = widget.selectedTypeId != null
                   ? documentTypes.firstWhere(
                       (type) => type.id == widget.selectedTypeId,
@@ -1329,7 +1531,6 @@ class _DocumentTypeSelectorState extends State<_DocumentTypeSelector> {
   }
 }
 
-/// Modèle de données pour un type de document (avec ID réel de l'API)
 class _DocumentType {
   final String id;
   final String name;
@@ -1344,7 +1545,6 @@ class _DocumentType {
   });
 }
 
-/// Modèle statique pour les types de documents (sans ID réel)
 class _StaticDocumentType {
   final String name;
   final String displayName;
@@ -1357,7 +1557,6 @@ class _StaticDocumentType {
   });
 }
 
-/// Bottom sheet pour sélectionner le type de document
 class _DocumentTypeSheet extends StatelessWidget {
   final List<_DocumentType> documentTypes;
   final String? selectedTypeId;
@@ -1384,7 +1583,6 @@ class _DocumentTypeSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: AppSpacing.spacing3),
               width: 40,
@@ -1394,17 +1592,11 @@ class _DocumentTypeSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            
-            // Title
             Padding(
               padding: const EdgeInsets.all(AppSpacing.spacing4),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.category,
-                    color: AppColors.primary,
-                    size: 24,
-                  ),
+                  Icon(Icons.category, color: AppColors.primary, size: 24),
                   const SizedBox(width: AppSpacing.spacing2),
                   Text(
                     'Type de document',
@@ -1416,20 +1608,18 @@ class _DocumentTypeSheet extends StatelessWidget {
                 ],
               ),
             ),
-            
             const Divider(height: 1),
-            
-            // Liste des types
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
                 padding: const EdgeInsets.all(AppSpacing.spacing2),
                 itemCount: documentTypes.length,
-                separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.spacing1),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: AppSpacing.spacing1),
                 itemBuilder: (context, index) {
                   final type = documentTypes[index];
                   final isSelected = type.id == selectedTypeId;
-                  
+
                   return InkWell(
                     onTap: () => onTypeSelected(type.id, type.displayName),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
@@ -1455,7 +1645,8 @@ class _DocumentTypeSheet extends StatelessWidget {
                               color: isSelected
                                   ? AppColors.primary
                                   : AppColors.gray100,
-                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.radiusSm),
                             ),
                             child: Icon(
                               getDocumentTypeIcon(type.displayName),
@@ -1481,7 +1672,8 @@ class _DocumentTypeSheet extends StatelessWidget {
                                         : AppColors.textPrimaryLight,
                                   ),
                                 ),
-                                if (type.description != null && type.description!.isNotEmpty) ...[
+                                if (type.description != null &&
+                                    type.description!.isNotEmpty) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     type.description!,
@@ -1507,7 +1699,6 @@ class _DocumentTypeSheet extends StatelessWidget {
                 },
               ),
             ),
-            
             const SizedBox(height: AppSpacing.spacing2),
           ],
         ),

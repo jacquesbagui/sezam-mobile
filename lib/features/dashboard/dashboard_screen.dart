@@ -295,8 +295,8 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0066FF),
-            Color(0xFF0047B3),
+            AppColors.primary,
+            AppColors.primaryDark,
           ],
         ),
         borderRadius: const BorderRadius.only(
@@ -328,50 +328,61 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
     return Row(
       children: [
         // Photo de profil
-        Container(
-          width: 60,
-          height: 60,
-            decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-          child: user.profileImage != null && user.profileImage!.isNotEmpty
-              ? ClipOval(
-                  child: CachedNetworkImage(
-                    imageUrl: user.profileImage!,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: AppColors.primary,
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                  ),
-                )
-              : Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+        Builder(
+          builder: (context) {
+            // Récupérer l'URL de la photo depuis profile.profile_photo ou profileImage
+            final profilePhotoUrl = user.profile?['profile_photo'] as String? ?? user.profileImage;
+            final hasPhoto = profilePhotoUrl != null && profilePhotoUrl.isNotEmpty;
+            
+            return Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  width: 2,
                 ),
+              ),
+              child: hasPhoto
+                  ? ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: profilePhotoUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          child: const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 30,
+                          ),
+                        ),
+                        errorWidget: (context, url, error) {
+                          print('❌ Erreur chargement image dashboard: $error, URL: $url');
+                          return Container(
+                            color: AppColors.primary,
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary.withValues(alpha: 0.2),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+            );
+          },
         ),
         const SizedBox(width: AppSpacing.spacing4),
         
@@ -1043,10 +1054,13 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
             ),
           ), 
           const SizedBox(height: AppSpacing.spacing4),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Pour les petits écrans, utiliser une liste verticale
-              if (constraints.maxWidth < 350) {
+          Builder(
+            builder: (context) {
+              // Utiliser MediaQuery pour obtenir la largeur réelle de l'écran
+              final screenWidth = MediaQuery.of(context).size.width;
+              // Pour les très petits écrans (< 320px), utiliser une liste verticale
+              // Sinon, utiliser le grid même sur les petits écrans
+              if (screenWidth < 320) {
                 return Column(
                   children: [
                     _buildActionCard(
@@ -1090,7 +1104,7 @@ class _DashboardHomeScreenState extends State<DashboardHomeScreen> {
                 );
               }
               
-              // Pour les écrans moyens et grands, utiliser une grille à 2 colonnes
+              // Pour tous les autres écrans, utiliser une grille à 2 colonnes
               return GridView.count(
                 padding: EdgeInsets.zero,
                 crossAxisCount: 2,
